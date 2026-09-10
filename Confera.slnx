@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/orchestration/">
+    <Project Path="orchestration/Confera.AppHost/Confera.AppHost.csproj" Id="a04f6849-ee0f-430f-8664-1020c1d969d3" />
+    <Project Path="orchestration/Confera.ServiceDefaults/Confera.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Confera.Api/Confera.Api.csproj" Id="04e2b08f-d04c-4268-a186-c668064c9459" />
+  </Folder>
+</Solution>

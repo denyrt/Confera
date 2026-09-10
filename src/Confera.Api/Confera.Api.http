@@ -1,0 +1,6 @@
+@Confera.Api_HostAddress = http://localhost:5089
+
+GET {{Confera.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
