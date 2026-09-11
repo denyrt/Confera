@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Confera.Application\Confera.Application.csproj" />
+    <ProjectReference Include="..\Confera.Domain\Confera.Domain.csproj" />
+  </ItemGroup>
+</Project>

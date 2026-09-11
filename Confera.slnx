@@ -1,9 +1,32 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="LICENSE.txt" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Solution Items/.config/">
+    <File Path=".config/dotnet-tools.json" />
+  </Folder>
+  <Folder Name="/docs/" />
   <Folder Name="/orchestration/">
     <Project Path="orchestration/Confera.AppHost/Confera.AppHost.csproj" Id="a04f6849-ee0f-430f-8664-1020c1d969d3" />
     <Project Path="orchestration/Confera.ServiceDefaults/Confera.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Confera.Api/Confera.Api.csproj" Id="04e2b08f-d04c-4268-a186-c668064c9459" />
+    <Project Path="src/Confera.Application/Confera.Application.csproj" Id="4d8099f6-4864-44af-9608-3bba0a4700bc" />
+    <Project Path="src/Confera.Domain/Confera.Domain.csproj" Id="c9b24236-4590-41bd-a94d-5ecd6064f7ce" />
+    <Project Path="src/Confera.Infrastructure/Confera.Infrastructure.csproj" Id="19d694a1-98b2-4ab5-87a5-4499ec238931" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Confera.Application.Tests/Confera.Application.Tests.csproj" Id="9d06733a-7cbd-4238-bffb-5499204ba5eb" />
+    <Project Path="tests/Confera.Domain.Tests/Confera.Domain.Tests.csproj" Id="4a83d872-44a3-4963-a97a-14e85791f593" />
+    <Project Path="tests/Confera.Integration.Tests/Confera.Integration.Tests.csproj" Id="e05bde5f-1c6e-46c8-9273-1756a443dbe9" />
   </Folder>
 </Solution>
