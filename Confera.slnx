@@ -13,7 +13,10 @@
   <Folder Name="/Solution Items/.config/">
     <File Path=".config/dotnet-tools.json" />
   </Folder>
-  <Folder Name="/docs/" />
+  <Folder Name="/docs/">
+    <File Path="docs/task-specification.md" />
+    <File Path="docs/task-specification.uk.md" />
+  </Folder>
   <Folder Name="/orchestration/">
     <Project Path="orchestration/Confera.AppHost/Confera.AppHost.csproj" Id="a04f6849-ee0f-430f-8664-1020c1d969d3" />
     <Project Path="orchestration/Confera.ServiceDefaults/Confera.ServiceDefaults.csproj" />
