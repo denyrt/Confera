@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <EnableSdkContainerDebugging>True</EnableSdkContainerDebugging>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0</ContainerBaseImage>
     <UserSecretsId>1191f065-3e23-452b-8880-3fe5eb631a88</UserSecretsId>
@@ -11,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\orchestration\Confera.ServiceDefaults\Confera.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Confera.Application\Confera.Application.csproj" />
+    <ProjectReference Include="..\Confera.Infrastructure\Confera.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
