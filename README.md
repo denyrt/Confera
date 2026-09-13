@@ -6,9 +6,16 @@ The project covers conference room management, availability search, bookings, re
 
 ## Project status
 
-This repository is being developed as a technical assignment.
-The original task specification is preserved in
-[`docs/task-specification.md`](docs/task-specification.md).
+The solution structure, core domain models, and basic room and booking-input
+validation are in place. Booking creation and pricing calculation are still
+unfinished. Application use cases, business API endpoints, persistence, initial
+data, reports, and behavioral tests remain to be implemented.
+
+The original requirements and project decisions are documented separately:
+
+- [Technical assignment](docs/task-specification.md) ([Ukrainian](docs/task-specification.uk.md)).
+- [Domain model and implementation scope](docs/domain-model.md).
+- [Booking and pricing decisions](docs/booking-and-pricing-rules.md).
 
 ## Contributing
 
