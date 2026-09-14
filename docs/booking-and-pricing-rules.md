@@ -29,6 +29,11 @@ current implementation status and API scope.
   standard tariff starts at 09:00 UTC, not 09:00 in a room's local time zone.
   Daylight-saving transitions therefore do not affect tariff calculations.
   Local business time zones are outside the current scope.
+- The common Domain/PostgreSQL time precision is one microsecond (10 .NET
+  ticks). Reject more precise booking timestamps and tariff hours before price
+  calculation. Floor system-generated UTC clock/creation values to this
+  precision before domain processing. Use standard PostgreSQL temporal types,
+  preserving finite UTC values rather than storing ticks or infinities.
 - API requests use `start` and `end` timestamps in ISO 8601 with `Z` or an
   explicit UTC offset. Accept them as `DateTimeOffset` and normalize to UTC
   before domain processing. Reject timestamps without an offset rather than
@@ -57,19 +62,17 @@ Split the booking at every applicable rule boundary. For each resulting segment,
 select the covering rule with the highest `Priority`. Peak pricing takes
 precedence over standard pricing; multipliers are not combined.
 
-Rules with the same priority must have disjoint daily intervals. Adjacent rules
-may share a priority under the `[start, end)` convention. Validate the complete
-rule set before calculation and reject equal-priority overlaps, even when a
-higher-priority rule would mask them or they fall outside the requested booking.
-This prevents ambiguous selection rather than resolving ties by input order.
+Every pricing rule has a globally unique integer priority. Validate the complete
+set before calculation and reject duplicate priorities even for disjoint or
+adjacent intervals, masked rules, or rules outside the requested booking.
+Priorities need not be consecutive or non-negative. Different-priority rules
+may overlap; input order never resolves a tie.
 
-Persistence must enforce the same rule against concurrent configuration writes.
-A unique index on priority alone is unnecessarily restrictive. The intended
-PostgreSQL constraint excludes overlapping daily ranges at an equal priority.
-Normalize a cross-midnight rule into two non-empty daily range entries, linked
-to the rule, so overlaps on either side of midnight are covered. Save those
-entries atomically with their rule. Database mappings and this constraint are
-not implemented yet.
+Persistence enforces `UNIQUE(Priority)` against concurrent configuration writes.
+No auxiliary daily-range table, tariff exclusion constraint, or synchronization
+trigger is required. This decision replaces D1's original policy permitting
+disjoint rules at the same priority; the Domain change is included in P1.
+The separate booking-overlap exclusion constraint remains required.
 
 Segment duration must be positive. The resulting segments must cover the booking
 completely, stay within its boundaries, and have no gaps or overlaps. Keep all
@@ -78,7 +81,8 @@ coalescing segments before rounding can change the recorded total.
 
 The initial tariffs are standard 09:00–18:00 at 1.00, morning 06:00–09:00 at
 0.90, evening 18:00–23:00 at 0.80, and peak 12:00–14:00 at 1.15. Peak has a
-higher priority than standard.
+higher priority than standard. Seed priorities are Morning 0, Standard 1,
+Evening 2, and Peak 3.
 
 For an 11:00–15:00 UTC booking, the intended segments are:
 
@@ -97,16 +101,24 @@ For an 11:00–15:00 UTC booking, the intended segments are:
 - Each selected service is charged once per booking using the room's current
   price. Tariff multipliers apply only to room rental, never to services.
   Unknown or duplicate service IDs are rejected; an empty selection is allowed.
-- Money is denominated in UAH and calculated using `decimal`. Room rates and
-  service prices must be positive and have at most three fractional digits;
-  reject more precise inputs rather than silently rounding them.
+- Money is denominated in UAH and calculated using `decimal`. Room hourly
+  rates, including snapshots, are 1,000–100,000 UAH; current and snapshotted
+  service prices are 200–20,000 UAH, inclusive. Both allow at most three
+  fractional digits. Multipliers are 0.50–2.00 inclusive with at most two
+  fractional digits. Ignore trailing zeros when checking precision; reject
+  more precise inputs rather than silently rounding them.
 - Round each segment price to three fractional digits using
   `MidpointRounding.AwayFromZero`. The total is the sum of the recorded, rounded
   segment prices and service prices, so the breakdown agrees with the total.
 - A segment price that rounds to zero is allowed. The 30-minute minimum applies
   to the whole booking, not each tariff segment. A zero total after rounding is
-  also allowed: positive rates and multipliers do not guarantee a positive
-  rounded result for arbitrarily small values.
+  also representable. Input hourly-rate and service-price minimums do not apply
+  to calculated segment prices.
+- Booking total has a technical representable range of
+  0–999,999,999,999,999.999 UAH; this is not an additional commercial limit.
+  Persist monetary values as unconstrained PostgreSQL `numeric` with explicit
+  range/precision checks and `NOT NULL`, so extra precision is rejected rather
+  than rounded by a fixed-scale column before its CHECK runs.
 - Record the room hourly rate, selected service names and prices, and segment
   tariff codes and multipliers as snapshots. Later configuration changes must
   not recalculate confirmed booking prices.
@@ -143,6 +155,14 @@ leading or trailing whitespace. Enforce this in persistence with a unique index
 over normalized names filtered to non-deleted rooms, not only an application
 check.
 
+Current service names follow the same comparison within each room. The shared
+normalization contract trims an explicit Unicode-whitespace set and uses
+Unicode simple uppercase consistent with PostgreSQL 18's `pg_c_utf8`, with
+ordinal key comparison. Preserve display spelling, internal spaces, accents,
+and alphabets. Generated database keys prevent bypass through direct SQL.
+The exact algorithm, .NET/SQL conformance checks, and whitespace set are defined
+in the [P1 specification](p1-persistence-specification.md#names-and-identity).
+
 Deleting a room is a soft-delete: retain its identity and booking history, exclude
 it from availability search, and reject new bookings for it. Reject deletion
 while any booking ends later than the current UTC time. A room with only completed
@@ -151,3 +171,17 @@ bookings may be deleted, and its history remains available to reports.
 A deleted room's name may be reused by a new room with a different ID. Reports
 identify and group rooms by ID rather than merging rooms with the same name.
 Soft-delete is required for rooms; it is not a blanket policy for every model.
+
+## Persistence and initial data
+
+[P1's complete specification](p1-persistence-specification.md) defines the
+initial schema, MigrationWorker, `postgres:18.6`, test isolation, and acceptance
+checks. P1 includes `Room.IsDeleted` and active-name uniqueness; room lifecycle
+operations and booking-dependent restrictions remain R1.
+
+Demo data is initialized outside schema migrations, explicitly by local
+AppHost's worker. Seed and a completion marker are committed once, atomically,
+only when business tables are empty. A marked database is never repaired or
+overwritten on startup. An unmarked database containing business data is left
+unchanged with a diagnostic. Normal tests migrate fresh isolated databases
+without demo seed. Explicitly resetting the database resets initialization.

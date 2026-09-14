@@ -35,7 +35,7 @@ alongside their corresponding application use cases.
 | --- | --- | --- | --- |
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
-| P1 | PostgreSQL persistence and infrastructure foundation | Planned | Next implementation task; open decisions are listed below. |
+| P1 | PostgreSQL persistence and infrastructure foundation | Planned | Decisions resolved on 2026-09-15; [complete specification and execution plan](p1-persistence-specification.md) prepared. Implementation has not started. |
 | B1 | Transactional booking application use case | Planned | Depends on P1. |
 | R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
@@ -60,6 +60,11 @@ Evidence: [domain tests](../tests/Confera.Domain.Tests/), PR #4 and the validati
 record in the delivery table. Application and Integration test projects remain
 empty; CI, availability checks, and concurrent-booking protection are not part of
 this completed domain task. Room lifecycle changes remain under R1.
+
+P1's approved specification changes numerical bounds, time precision, name
+comparison, and tariff priorities. The equal-priority statement above records
+D1's delivered behavior; it is not the new target policy or a claim that P1's
+changes are already implemented.
 
 ### W1: Implementation roadmap and shared maintenance process
 
@@ -98,16 +103,43 @@ Completion criteria:
   preserves test results and failure diagnostics.
 - Local startup and test commands are documented and verified.
 
-Open decisions to clarify before implementation:
+The [P1 specification](p1-persistence-specification.md) is the detailed acceptance
+contract and ordered implementation plan. It includes required Domain updates,
+SQL integrity/concurrency checks, first-start/repeat-start worker behavior,
+atomic seed, container recreation, and test isolation. All criteria must pass
+before P1 is Verified; a build alone is insufficient.
 
-- Monetary column precision, maximum accepted values, and multiplier precision.
-- Timestamp precision at the .NET/PostgreSQL boundary.
-- Migration execution through a separate runner or explicit command.
-- Inclusion of room soft-delete state in the initial schema.
-- Whether to retain a `Room.Bookings` navigation while keeping Booking an
-  independent aggregate; the current implementation has no such navigation.
-- Test database isolation and fixture lifetime, plus the PostgreSQL image version
-  used consistently for local development and integration tests.
+Decisions resolved during planning on 2026-09-15:
+
+- Inclusive numerical bounds and explicit `numeric` range/precision checks;
+  multiplier precision is two digits and money precision is three.
+- One-microsecond UTC precision; reject finer external inputs before pricing
+  and canonicalize system clock values before Domain processing.
+- Dedicated MigrationWorker with bounded provider retries, success gating for
+  API, and one-time transactional demo initialization outside schema migrations.
+- Minimal `Room.IsDeleted` in the initial schema, with normalized active-name
+  uniqueness; room lifecycle operations remain R1.
+- Shared specified name normalization; Room owns current services and retains
+  no booking-history navigation. Booking remains an independent aggregate.
+- Globally unique tariff Priority replaces equal-priority interval constraints;
+  booking overlap protection remains a PostgreSQL exclusion constraint.
+- Consistent `postgres:18.6`, persistent local development volume with the
+  PostgreSQL 18 mount path, temporary test containers, and a fresh database per
+  test. AppHost tests never use the local development volume.
+
+No business or architecture decision from P1 planning remains open. Compatible
+package patch versions and routine implementation details are selected and
+verified within the specification. New material incompatibilities must be
+surfaced rather than silently changing this contract.
+
+Planning result: the specification and ordered implementation plan are prepared;
+P1 stays Planned. Planning-document verification does not establish persistence
+delivery. Publication of implementation changes is a separate user request.
+
+Planning validation on 2026-09-15: tools/package restore succeeded; Release
+build passed with no warnings or errors; all 70 existing Domain tests passed;
+36 local documentation links/anchors, 27 solution paths, documentation
+registration, and diff whitespace checks passed. No runtime behavior changed.
 
 ### B1: Transactional booking application use case
 
@@ -157,7 +189,8 @@ Completion criteria:
 
 - Both agreed reports use recorded prices and the documented reporting period
   semantics, include soft-deleted room history, and avoid join multiplication.
-- Initial rooms, services, and tariffs follow the assignment and decision docs.
+- Initial rooms, services, and tariffs delivered under P1 still follow the
+  assignment and decision docs; Q1 verifies their end-to-end use.
 - Documentation accurately describes the implemented scope and verified commands.
 - All relevant implemented test suites pass; limitations are explicitly recorded.
 
