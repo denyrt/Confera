@@ -1,3 +1,5 @@
+using Confera.Domain.Rooms;
+
 namespace Confera.Domain.Bookings;
 
 public sealed class Booking
@@ -12,8 +14,8 @@ public sealed class Booking
     public DateTime CreatedAtUtc { get; private set; }
     public decimal HourlyRateSnapshot { get; private set; }
     public decimal TotalPrice { get; private set; }
-    public IReadOnlyCollection<BookedRoomServiceSnapshot> Services => _services;
-    public IReadOnlyCollection<BookingPriceSegment> PriceSegments => _priceSegments;
+    public IReadOnlyCollection<BookedRoomServiceSnapshot> Services => _services.AsReadOnly();
+    public IReadOnlyCollection<BookingPriceSegment> PriceSegments => _priceSegments.AsReadOnly();
 
     private Booking()
     {
@@ -25,28 +27,67 @@ public sealed class Booking
         DateTime endsAtUtc,
         DateTime nowUtc,
         decimal hourlyRateSnapshot,
-        decimal totalPrice,
-        IReadOnlyCollection<BookedRoomServiceSnapshot> services,
-        IReadOnlyCollection<BookingPriceSegment> priceSegments)
+        IReadOnlyCollection<RoomServiceData> services,
+        IReadOnlyList<BookingRentalSegment> priceSegments)
     {
         ArgumentNullException.ThrowIfNull(services, nameof(services));
         ArgumentNullException.ThrowIfNull(priceSegments, nameof(priceSegments));
 
         DomainValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
-
-        if (priceSegments.Count == 0)
-        {
-            throw new ArgumentException("", nameof(priceSegments));
-        }
+        RequireContinuousCoverage(priceSegments, startsAtUtc, endsAtUtc);
+        RequireMatchingHourlyRate(priceSegments, hourlyRateSnapshot);
 
         Id = Guid.CreateVersion7();
         RoomId = DomainValidation.RequireGuid(roomId, nameof(roomId));
         StartsAtUtc = startsAtUtc;
         EndsAtUtc = endsAtUtc;
         CreatedAtUtc = nowUtc;
-        HourlyRateSnapshot = DomainValidation.RequirePositive(hourlyRateSnapshot, nameof(hourlyRateSnapshot));
-        TotalPrice = DomainValidation.RequirePositive(totalPrice, nameof(totalPrice));
-        _services = [.. services];
-        _priceSegments = [.. priceSegments];
+        HourlyRateSnapshot = DomainValidation.RequireMoney(hourlyRateSnapshot, nameof(hourlyRateSnapshot));
+
+        _services.AddRange(services.Select(x => new BookedRoomServiceSnapshot(Id, x.Name, x.Price)));
+        _priceSegments.AddRange(priceSegments.Select(x => new BookingPriceSegment(Id, x)));
+
+        var rentalPrice = _priceSegments.Sum(x => x.Price);
+        var servicePrice = _services.Sum(x => x.ServicePriceSnapshot);
+        TotalPrice = DomainValidation.RequireNonNegative(rentalPrice + servicePrice, nameof(TotalPrice));
+    }
+
+    private static void RequireContinuousCoverage(
+        IReadOnlyList<BookingRentalSegment> priceSegments,
+        DateTime startsAtUtc,
+        DateTime endsAtUtc)
+    {
+        if (priceSegments.Count == 0)
+        {
+            throw new ArgumentException("Booking must contain rental segments.", nameof(priceSegments));
+        }
+
+        var nextStart = startsAtUtc;
+        foreach (var segment in priceSegments)
+        {
+            ArgumentNullException.ThrowIfNull(segment, nameof(priceSegments));
+
+            if (segment.StartsAtUtc != nextStart || segment.EndsAtUtc > endsAtUtc)
+            {
+                throw new ArgumentException("Rental segments must cover the booking in order without gaps or overlaps.", nameof(priceSegments));
+            }
+
+            nextStart = segment.EndsAtUtc;
+        }
+
+        if (nextStart != endsAtUtc)
+        {
+            throw new ArgumentException("Rental segments must cover the entire booking.", nameof(priceSegments));
+        }
+    }
+
+    private static void RequireMatchingHourlyRate(
+        IReadOnlyList<BookingRentalSegment> priceSegments,
+        decimal hourlyRateSnapshot)
+    {
+        if (priceSegments.Any(segment => segment.HourlyRate != hourlyRateSnapshot))
+        {
+            throw new ArgumentException("Every rental segment must use the booking's hourly rate.", nameof(priceSegments));
+        }
     }
 }
