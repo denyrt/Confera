@@ -18,6 +18,7 @@
     <File Path="docs/agent-workflow.md" />
     <File Path="docs/booking-and-pricing-rules.md" />
     <File Path="docs/domain-model.md" />
+    <File Path="docs/implementation-roadmap.md" />
     <File Path="docs/task-specification.md" />
     <File Path="docs/task-specification.uk.md" />
   </Folder>
