@@ -70,20 +70,26 @@ dotnet build Confera.slnx --configuration Release --no-restore
 dotnet run --project orchestration/Confera.AppHost
 ```
 
-Once tests exist, run the relevant test projects. The repository selects
+Run the relevant test projects. The repository selects
 Microsoft.Testing.Platform in `global.json`; use its CLI syntax:
 
 ```powershell
 dotnet test --solution Confera.slnx --configuration Release --no-build
 ```
 
-The initial test projects contain no tests. The current runner reports
-`Zero tests ran` with exit code 8 for each empty test project, so the solution
+Domain behavioral tests are implemented. To run the relevant suite:
+
+```powershell
+dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build
+```
+
+Application and Integration test projects still contain no tests. The runner
+reports `Zero tests ran` with exit code 8 for each empty project, so the solution
 test command currently fails. Do not suppress this result or add placeholder
 tests solely to make it green. A successful build or zero discovered tests is
-not evidence of tested application behavior. Add meaningful
-tests with behavior changes. Docker will be needed when container-backed tests
-are introduced; PostgreSQL and Testcontainers are not configured yet.
+not evidence of tested application behavior. Add meaningful tests with behavior
+changes. Docker will be needed when container-backed tests are introduced;
+PostgreSQL and Testcontainers are not configured yet.
 
 Before opening a PR, review `git diff` and `git status`, run `git diff --check`,
 build the solution, and run relevant tests. Include new source and configuration

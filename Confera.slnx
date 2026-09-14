@@ -3,6 +3,7 @@
     <File Path=".editorconfig" />
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
+    <File Path="AGENTS.md" />
     <File Path="CONTRIBUTING.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
@@ -14,6 +15,7 @@
     <File Path=".config/dotnet-tools.json" />
   </Folder>
   <Folder Name="/docs/">
+    <File Path="docs/agent-workflow.md" />
     <File Path="docs/booking-and-pricing-rules.md" />
     <File Path="docs/domain-model.md" />
     <File Path="docs/task-specification.md" />

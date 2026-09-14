@@ -57,9 +57,24 @@ Split the booking at every applicable rule boundary. For each resulting segment,
 select the covering rule with the highest `Priority`. Peak pricing takes
 precedence over standard pricing; multipliers are not combined.
 
-If multiple covering rules share the highest priority, reject the calculation as
-ambiguous. Segment duration must be positive. The resulting segments must cover
-the booking completely, stay within its boundaries, and have no gaps or overlaps.
+Rules with the same priority must have disjoint daily intervals. Adjacent rules
+may share a priority under the `[start, end)` convention. Validate the complete
+rule set before calculation and reject equal-priority overlaps, even when a
+higher-priority rule would mask them or they fall outside the requested booking.
+This prevents ambiguous selection rather than resolving ties by input order.
+
+Persistence must enforce the same rule against concurrent configuration writes.
+A unique index on priority alone is unnecessarily restrictive. The intended
+PostgreSQL constraint excludes overlapping daily ranges at an equal priority.
+Normalize a cross-midnight rule into two non-empty daily range entries, linked
+to the rule, so overlaps on either side of midnight are covered. Save those
+entries atomically with their rule. Database mappings and this constraint are
+not implemented yet.
+
+Segment duration must be positive. The resulting segments must cover the booking
+completely, stay within its boundaries, and have no gaps or overlaps. Keep all
+applicable rule boundaries, including boundaries of lower-priority rules;
+coalescing segments before rounding can change the recorded total.
 
 The initial tariffs are standard 09:00–18:00 at 1.00, morning 06:00–09:00 at
 0.90, evening 18:00–23:00 at 0.80, and peak 12:00–14:00 at 1.15. Peak has a
