@@ -11,7 +11,10 @@ Before creating a branch or changing repository files, read and follow:
    reporting semantics, and deferred features.
 5. [Booking and pricing decisions](docs/booking-and-pricing-rules.md) for the
    agreed time, tariff, money, snapshot, room-change, and deletion rules.
-6. [Technical assignment](docs/task-specification.md), or its Ukrainian
+6. [Implementation roadmap](docs/implementation-roadmap.md) for task status,
+   completion criteria, validation evidence, and outstanding decisions. Maintain
+   it according to CONTRIBUTING.md as work advances and tasks finish.
+7. [Technical assignment](docs/task-specification.md), or its Ukrainian
    counterpart, when interpreting assignment requirements.
 
 Read additional documentation relevant to the task and re-read affected sources

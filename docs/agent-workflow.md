@@ -119,6 +119,16 @@ Update README and affected decision documents when their statements become
 inaccurate. Distinguish implemented behavior from planned work. Preserve the
 original technical assignment rather than rewriting it as implementation notes.
 
+Read [the implementation roadmap](implementation-roadmap.md) during task
+analysis. Include the relevant roadmap update in the plan and implementation
+changes, recording actual results, validation, and remaining work. Follow
+CONTRIBUTING.md's roadmap-maintenance process and the roadmap's status
+definitions. Mark a task Done only after merge and successful relevant checks;
+confirm the actual merge and validation evidence before applying CONTRIBUTING.md's
+exception for a final status update directly on `main`. Do not assume this update
+will happen automatically. Include any pending update after merge in the handoff
+to the user or the assigned agent.
+
 Register every new documentation file in Confera.slnx using its actual relative
 path under the corresponding solution folder, such as `/docs/`. Register root
 agent instructions under `/Solution Items/`.

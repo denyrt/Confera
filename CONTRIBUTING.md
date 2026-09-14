@@ -6,6 +6,9 @@ Use GitHub Flow: create a short-lived branch from an up-to-date `main`, make a
 focused change, open a pull request into `main`, review and validate it, then
 squash merge and delete the branch. Keep `main` buildable.
 
+The only exception is the final roadmap status update described under Roadmap
+maintenance below.
+
 There is no permanent `develop` branch or separate release branch workflow.
 Branch prefixes are a repository naming convention, not Gitflow.
 
@@ -94,6 +97,48 @@ PostgreSQL and Testcontainers are not configured yet.
 Before opening a PR, review `git diff` and `git status`, run `git diff --check`,
 build the solution, and run relevant tests. Include new source and configuration
 files in the commit, but exclude generated outputs and credentials.
+
+## Roadmap maintenance
+
+[docs/implementation-roadmap.md](docs/implementation-roadmap.md) records task
+status, completion criteria, results, and validation evidence. Maintaining it is
+part of completing a task, whether the author is a person or an agent.
+
+For every feature or task that advances or changes the roadmap:
+
+1. Update the affected entry in the implementation PR with its actual progress,
+   delivered behavior, remaining work, and validation results. Use the roadmap's
+   status definitions; an unmerged implementation cannot be Done.
+2. If the work is not represented, add a task with the agreed scope and completion
+   criteria. Record approved scope changes and unresolved decisions instead of
+   silently changing the meaning of an existing task.
+3. After the implementation merges and its completion criteria and relevant
+   checks are satisfied, update the entry to Done and record its merged PR or
+   commit. The author or maintainer can perform this update or explicitly
+   delegate it to an agent.
+
+### Final status update after merge
+
+After confirming that the implementation is merged into an up-to-date `main`,
+the task's completion criteria are met, and relevant checks passed, the author,
+maintainer, or assigned agent may make one documentation commit directly on
+`main` without a separate branch or PR.
+
+This exception permits changes only to `docs/implementation-roadmap.md`, limited
+to marking the existing task Done and recording its merged PR or commit and
+validation evidence. Review the diff and run `git diff --check` before committing.
+For example:
+
+```text
+docs(roadmap): mark P1 as done
+```
+
+Changes to code, configuration, other documentation, task scope, completion
+criteria, or new roadmap tasks still follow GitHub Flow through a branch and PR.
+
+For a partial delivery, record the completed portion and leave the remaining
+task open. Keep results concise and link to detailed requirements rather than
+duplicating them. This is a shared maintenance rule, not an automated CI check.
 
 ## Shared configuration
 

@@ -21,6 +21,7 @@ The original requirements and project decisions are documented separately:
 - [Technical assignment](docs/task-specification.md) ([Ukrainian](docs/task-specification.uk.md)).
 - [Domain model, API scope, initial data, and reports](docs/domain-model.md).
 - [Booking, pricing, room changes, and deletion rules](docs/booking-and-pricing-rules.md).
+- [Implementation roadmap, task status, and completion criteria](docs/implementation-roadmap.md).
 
 The agreed scope is the assignment's five core API operations plus two read-only
 reports. Booking and tariff times use UTC; bookings last 30 minutes to 24 hours
