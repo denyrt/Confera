@@ -6,10 +6,15 @@ The project covers conference room management, availability search, bookings, re
 
 ## Project status
 
-The solution structure, core domain models, and basic room and booking-input
-validation are in place. Booking creation and pricing calculation are still
-unfinished. Application use cases, business API endpoints, persistence, initial
-data, reports, and behavioral tests remain to be implemented.
+The solution structure and core domain models are in place. Domain booking
+creation calculates fully covered UTC tariff segments and preserves prices and
+selected services as snapshots. Behavioral domain tests cover pricing, input
+validation, snapshots, and pricing-rule priority overlaps.
+
+Application use cases, business API endpoints, persistence, initial data,
+reports, room soft-delete, and booking-dependent room-change restrictions remain
+to be implemented. The domain alone does not check room availability or protect
+against concurrent bookings.
 
 The original requirements and project decisions are documented separately:
 

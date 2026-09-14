@@ -17,11 +17,11 @@ public sealed class RoomService
         Id = Guid.CreateVersion7();
         RoomId = DomainValidation.RequireGuid(roomId, nameof(roomId));
         Name = DomainValidation.RequireText(name, maxLength: 64, nameof(name));
-        Price = DomainValidation.RequirePositive(price, nameof(price));
+        Price = DomainValidation.RequireMoney(price, nameof(price));
     }
 
     internal void UpdatePrice(decimal price)
     {
-        Price = DomainValidation.RequirePositive(price, nameof(price));
+        Price = DomainValidation.RequireMoney(price, nameof(price));
     }
 }

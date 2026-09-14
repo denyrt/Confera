@@ -1,0 +1,21 @@
+# Instructions for agents working on Confera
+
+Before creating a branch or changing repository files, read and follow:
+
+1. [CONTRIBUTING.md](CONTRIBUTING.md) in full. It is the reference for repository
+   workflow, naming, configuration, dependency boundaries, and validation.
+2. [Agent workflow guide](docs/agent-workflow.md) in full. Analysis, clarification
+   of ambiguous decisions, and explicit approval of the plan precede execution.
+3. [README.md](README.md) for actual implementation status and scope.
+4. [Domain model](docs/domain-model.md) for ownership, API scope, initial data,
+   reporting semantics, and deferred features.
+5. [Booking and pricing decisions](docs/booking-and-pricing-rules.md) for the
+   agreed time, tariff, money, snapshot, room-change, and deletion rules.
+6. [Technical assignment](docs/task-specification.md), or its Ukrainian
+   counterpart, when interpreting assignment requirements.
+
+Read additional documentation relevant to the task and re-read affected sources
+when the user corrects a decision or the scope changes. Explicit user instructions
+take precedence over repository guidance; surface unresolved conflicts before
+implementation. Continue within an approved plan without repeatedly requesting
+the same approval.

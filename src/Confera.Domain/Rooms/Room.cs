@@ -5,14 +5,12 @@ namespace Confera.Domain.Rooms;
 public sealed class Room
 {
     private readonly List<RoomService> _services = [];
-    private readonly List<Booking> _booking = [];
 
     public Guid Id { get; private set; }
     public string Name { get; private set; }
     public int Capacity { get; private set; }
     public decimal HourlyRate { get; private set; }
-    public IReadOnlyCollection<RoomService> Services => _services;
-    public IReadOnlyCollection<Booking> Bookings => _booking;
+    public IReadOnlyCollection<RoomService> Services => _services.AsReadOnly();
 
     private Room()
     {
@@ -24,7 +22,7 @@ public sealed class Room
         Id = Guid.CreateVersion7();
         Name = DomainValidation.RequireText(name, 64, nameof(name));
         Capacity = DomainValidation.RequirePositive(capacity, nameof(capacity));
-        HourlyRate = DomainValidation.RequirePositive(hourlyRate, nameof(hourlyRate));
+        HourlyRate = DomainValidation.RequireMoney(hourlyRate, nameof(hourlyRate));
     }
 
     public void SetName(string name)
@@ -39,7 +37,7 @@ public sealed class Room
 
     public void SetHourlyRate(decimal hourlyRate)
     {
-        HourlyRate = DomainValidation.RequirePositive(hourlyRate, nameof(hourlyRate));
+        HourlyRate = DomainValidation.RequireMoney(hourlyRate, nameof(hourlyRate));
     }
 
     public void SetServices(IEnumerable<RoomServiceData> services)
@@ -49,7 +47,7 @@ public sealed class Room
         var validated = services
             .Select(x => new RoomServiceData(
                 DomainValidation.RequireText(x.Name, 64, nameof(x.Name)),
-                DomainValidation.RequirePositive(x.Price, nameof(x.Price))))
+                DomainValidation.RequireMoney(x.Price, nameof(x.Price))))
             .ToArray();
 
         ThrowIfServiceNamesNotUnique(validated, nameof(services));
@@ -77,26 +75,36 @@ public sealed class Room
         }
     }
 
+    /// <summary>Creates a priced booking; availability and persistence are coordinated by the caller.</summary>
     public Booking Book(
-        DateTime startDate,
-        DateTime endDate,
+        DateTime startsAtUtc,
+        DateTime endsAtUtc,
         DateTime nowUtc,
         IReadOnlyList<Guid> serviceIds,
         IReadOnlyList<BookingPricingRule> rules)
     {
-        DomainValidation.RequireBookingPeriod(startDate, endDate, nowUtc);
+        DomainValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
         ArgumentNullException.ThrowIfNull(serviceIds, nameof(serviceIds));
         ArgumentNullException.ThrowIfNull(rules, nameof(rules));
 
         EnsureUniqueIds(serviceIds, nameof(serviceIds));
         EnsureServiceIdsExists(serviceIds, nameof(serviceIds));
 
-        throw new NotImplementedException();
+        var selectedIds = serviceIds.ToHashSet();
+        var selectedServices = _services
+            .Where(x => selectedIds.Contains(x.Id))
+            .Select(x => new RoomServiceData(x.Name, x.Price))
+            .ToArray();
+
+        var segments = BookingPriceCalculator.Calculate(startsAtUtc, endsAtUtc, HourlyRate, rules);
+
+        return new Booking(Id, startsAtUtc, endsAtUtc, nowUtc, HourlyRate, selectedServices, segments);
     }
 
     private void EnsureServiceIdsExists(IEnumerable<Guid> serviceIds, string parameterName)
     {
         var supportedIds = _services.Select(x => x.Id).ToHashSet();
+
         if (serviceIds.Any(id => !supportedIds.Contains(id)))
         {
             throw new ArgumentException("Selected services are not available in this room.", parameterName);

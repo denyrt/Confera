@@ -43,14 +43,8 @@ internal static class DomainValidation
         DateTime endsAtUtc,
         DateTime nowUtc)
     {
-        RequireUtc(startsAtUtc, nameof(startsAtUtc));
-        RequireUtc(endsAtUtc, nameof(endsAtUtc));
+        RequireRentalPeriod(startsAtUtc, endsAtUtc);
         RequireUtc(nowUtc, nameof(nowUtc));
-
-        if (endsAtUtc <= startsAtUtc)
-        {
-            throw new ArgumentException("Booking must end after it starts.", nameof(endsAtUtc));
-        }
 
         if (startsAtUtc < nowUtc)
         {
@@ -66,5 +60,50 @@ internal static class DomainValidation
         }
 
         return value;
+    }
+
+    public static decimal RequireMoney(decimal value, string parameterName)
+    {
+        RequirePositive(value, parameterName);
+
+        if (decimal.Round(value, 3) != value)
+        {
+            throw new ArgumentException("Money must have at most three fractional digits.", parameterName);
+        }
+
+        return value;
+    }
+
+    public static decimal RequireNonNegative(decimal value, string parameterName)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Value cannot be negative.");
+        }
+
+        return value;
+    }
+
+    public static void RequireUtcInterval(DateTime startsAtUtc, DateTime endsAtUtc)
+    {
+        RequireUtc(startsAtUtc, nameof(startsAtUtc));
+        RequireUtc(endsAtUtc, nameof(endsAtUtc));
+
+        if (endsAtUtc <= startsAtUtc)
+        {
+            throw new ArgumentException("Interval must end after it starts.", nameof(endsAtUtc));
+        }
+    }
+
+    public static void RequireRentalPeriod(DateTime startsAtUtc, DateTime endsAtUtc)
+    {
+        RequireUtcInterval(startsAtUtc, endsAtUtc);
+
+        var duration = endsAtUtc - startsAtUtc;
+
+        if (duration < TimeSpan.FromMinutes(30) || duration > TimeSpan.FromHours(24))
+        {
+            throw new ArgumentOutOfRangeException(nameof(endsAtUtc), "Booking duration must be between 30 minutes and 24 hours.");
+        }
     }
 }

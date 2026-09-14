@@ -13,47 +13,62 @@ scope. Intended behavior below does not imply that it is already implemented.
 | `BookingPricingRule` | A daily time interval, multiplier, and priority used to determine pricing and bookable hours. |
 | `BookedRoomServiceSnapshot` | The selected service name and price recorded for a booking. |
 | `BookingPriceSegment` | A portion of a booking with the applicable tariff and price recorded. |
+| `BookingRentalSegment` | An immutable calculated rental segment without booking ownership or persistence identity. |
 
 Room details can be updated through validated methods. Replacing room services
 validates the complete input before changing the collection, requires unique
 names ignoring case, and preserves existing service IDs when names match.
 
-Booking-input validation requires UTC timestamps, an end after the start, and a
-start that is not before the supplied current time. Selected service IDs must be
-unique and belong to the room; an empty selection is allowed.
+Booking-input validation requires UTC timestamps, a duration of 30 minutes to
+24 hours inclusive, and a start that is not before the supplied current time.
+Selected service IDs must be unique and belong to the room; an empty selection
+is allowed. Room rates and service prices must be positive and have at most
+three fractional digits; trailing decimal zeros do not count as extra precision.
+
+`BookingPriceCalculator.Calculate(...)` returns immutable rental segments,
+selecting the highest-priority rule at each boundary. It requires full tariff
+coverage, handles daily rules crossing midnight, and rounds each segment to
+three fractional digits using `MidpointRounding.AwayFromZero`.
+
+`BookingPricingRule.ValidateSet(...)` rejects equal-priority rules whose daily
+intervals overlap, including across midnight. Disjoint and adjacent rules may
+share a priority. This validates the entire supplied configuration, even when
+the conflicting rules do not intersect the requested booking.
+
+`Room.Book(...)` selects the current services, calculates rental segments, and
+returns a complete `Booking`. Booking generates its ID before creating its own
+service snapshots and price segments. It verifies ordered full segment coverage
+and a consistent hourly rate, then calculates total price from the recorded
+rounded segment prices and service prices. Rounded zero segments and totals are
+allowed. Public collections expose read-only wrappers.
+
+Booking is an independent aggregate; Room owns its current services and does
+not hold booking history. Creating a booking does not load or append to a room's
+history. Availability checks and saving the returned booking belong to the
+application and infrastructure layers.
 
 ## Intended behavior and remaining work
 
-`Room.Book(...)` is intended to select the room's current services, calculate
-pricing, and return a complete `Booking`. It currently validates input and then
-throws `NotImplementedException`. `BookingPriceCalculator` is also a stub; its
-contract and algorithm remain to be implemented.
-
-Booking creation must generate the booking ID before creating its child snapshots
-and segments. Segment ownership, interval coverage, and consistency of the total
-price are not yet enforced completely.
-
-Snapshots are intended to keep confirmed booking prices independent of later
-changes to room rates, services, or pricing rules.
-
-The ownership of booking history is still to be finalized. `Room` currently
-exposes a booking collection, but no implemented behavior populates it. Creating
-a booking does not inherently require loading the room's entire booking history.
+Snapshots keep confirmed booking prices independent of later changes to room
+rates, services, or pricing rules. Domain tests verify this behavior; persistence
+and reporting over those snapshots remain to be implemented.
 
 Application use cases will coordinate availability checks and persistence.
 Infrastructure must provide protection against concurrent overlapping bookings;
-input validation alone cannot provide this guarantee.
+input validation alone cannot provide this guarantee. The agreed persistence
+approach is a short transaction locking the room row for booking and room-change
+operations, plus a PostgreSQL exclusion constraint on room ID and the half-open
+booking interval. Pricing-rule priority overlaps must also be constrained in
+persistence as described in the booking and pricing decisions.
 
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.
 
 The current models do not yet enforce all these decisions. Remaining work
-includes the 30-minute to 24-hour duration bounds, three-digit monetary
-precision and rounding, acceptance of rounded zero prices, active-room name
-uniqueness, room soft-delete, and restrictions on capacity reduction and deletion
-when ongoing or future bookings exist. Service renaming is allowed by the agreed
-policy; the current collection replacement matches services by name rather than
-providing a dedicated rename operation.
+includes active-room name uniqueness, room soft-delete, and restrictions on
+capacity reduction and deletion when ongoing or future bookings exist. Service
+renaming is allowed by the agreed policy; the current collection replacement
+matches services by name rather than providing a dedicated rename operation.
 
 ## API and application scope
 
