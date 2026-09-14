@@ -22,3 +22,15 @@ when the user corrects a decision or the scope changes. Explicit user instructio
 take precedence over repository guidance; surface unresolved conflicts before
 implementation. Continue within an approved plan without repeatedly requesting
 the same approval.
+
+## Task completion
+
+After completing a repository task, include recommended commit subject(s) and
+a recommended pull request title in the final response. Label them separately,
+use the English Conventional Commit format defined in CONTRIBUTING.md, and
+describe the final scope of the changes. Provide these recommendations even
+when the user will commit or open the pull request manually; the commit subject
+and pull request title may be identical when appropriate.
+
+Creating a pull request requires a separate explicit user request. Recommending
+a title does not authorize creating the pull request.

@@ -5,6 +5,10 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
+This section describes D1's currently implemented behavior. P1's approved
+changes below are still planned; updating the decisions does not imply that
+the existing code already enforces them.
+
 | Model | Responsibility |
 | --- | --- |
 | `Room` | Room identity, name, capacity, hourly rate, and available services. |
@@ -58,8 +62,8 @@ Infrastructure must provide protection against concurrent overlapping bookings;
 input validation alone cannot provide this guarantee. The agreed persistence
 approach is a short transaction locking the room row for booking and room-change
 operations, plus a PostgreSQL exclusion constraint on room ID and the half-open
-booking interval. Pricing-rule priority overlaps must also be constrained in
-persistence as described in the booking and pricing decisions.
+booking interval. Tariff priorities will be globally unique in Domain and
+persistence, replacing D1's allowance for disjoint equal-priority rules.
 
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.
@@ -69,6 +73,13 @@ includes active-room name uniqueness, room soft-delete, and restrictions on
 capacity reduction and deletion when ongoing or future bookings exist. Service
 renaming is allowed by the agreed policy; the current collection replacement
 matches services by name rather than providing a dedicated rename operation.
+
+The [complete P1 specification](p1-persistence-specification.md) includes minimal
+`Room.IsDeleted` state, normalized active-room/service name integrity, inclusive
+rate/service/multiplier bounds, microsecond time precision, unique priorities,
+EF mappings/migrations, MigrationWorker and isolated real-database tests.
+Lifecycle operations and booking-dependent room restrictions remain R1.
+Room continues to own services without a `Room.Bookings` navigation.
 
 ## API and application scope
 
@@ -101,6 +112,12 @@ rooms. Each offering belongs to that room and has its own price and identity;
 there is no shared service catalog. The original assignment does not prescribe
 which services belong to each seed room. Selecting varied initial service sets
 is an implementation detail, not a requirement that every room offer all three.
+
+P1 records the chosen distribution and unique tariff priorities. Demo seed is
+explicit worker behavior outside schema migrations, atomically marked once
+only in an empty business database. Later launches preserve edited/deleted
+data; an unmarked non-empty database is left unchanged. Tests use fresh isolated
+databases without demo data unless testing initialization explicitly.
 
 ## Reports
 
