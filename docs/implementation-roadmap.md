@@ -34,7 +34,7 @@ alongside their corresponding application use cases.
 | ID | Task | Status | Delivery and evidence |
 | --- | --- | --- | --- |
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
-| W1 | Implementation roadmap and shared maintenance process | Verified | Documentation changes on `docs/implementation-roadmap`; checks passed on 2026-09-15; not merged. |
+| W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
 | P1 | PostgreSQL persistence and infrastructure foundation | Planned | Next implementation task; open decisions are listed below. |
 | B1 | Transactional booking application use case | Planned | Depends on P1. |
 | R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
@@ -76,7 +76,9 @@ Completion criteria:
 
 Validation on 2026-09-15: the Release build passed with no warnings or errors;
 diff whitespace checks, 22 local documentation links, and solution item paths
-passed verification. No application behavior changed. Delivery awaits merge.
+passed verification. No application behavior changed. PR #5 was merged as
+`c5c031e` on 2026-09-15; merge into `origin/main` was confirmed, and documentation
+links and solution item paths were verified again when recording completion.
 
 ### P1: PostgreSQL persistence and infrastructure foundation
 
