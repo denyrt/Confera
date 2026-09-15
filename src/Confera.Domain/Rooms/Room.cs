@@ -10,6 +10,7 @@ public sealed class Room
     public string Name { get; private set; }
     public int Capacity { get; private set; }
     public decimal HourlyRate { get; private set; }
+    public bool IsDeleted { get; private set; }
     public IReadOnlyCollection<RoomService> Services => _services.AsReadOnly();
 
     private Room()
@@ -22,7 +23,7 @@ public sealed class Room
         Id = Guid.CreateVersion7();
         Name = DomainValidation.RequireText(name, 64, nameof(name));
         Capacity = DomainValidation.RequirePositive(capacity, nameof(capacity));
-        HourlyRate = DomainValidation.RequireMoney(hourlyRate, nameof(hourlyRate));
+        HourlyRate = DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
     }
 
     public void SetName(string name)
@@ -37,7 +38,7 @@ public sealed class Room
 
     public void SetHourlyRate(decimal hourlyRate)
     {
-        HourlyRate = DomainValidation.RequireMoney(hourlyRate, nameof(hourlyRate));
+        HourlyRate = DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
     }
 
     public void SetServices(IEnumerable<RoomServiceData> services)
@@ -47,18 +48,18 @@ public sealed class Room
         var validated = services
             .Select(x => new RoomServiceData(
                 DomainValidation.RequireText(x.Name, 64, nameof(x.Name)),
-                DomainValidation.RequireMoney(x.Price, nameof(x.Price))))
+                DomainValidation.RequireServicePrice(x.Price, nameof(x.Price))))
             .ToArray();
 
         ThrowIfServiceNamesNotUnique(validated, nameof(services));
 
-        var newServicesMap = validated.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        var newServicesMap = validated.ToDictionary(x => NameIdentity.Key(x.Name), StringComparer.Ordinal);
 
         for (var i = _services.Count - 1; i >= 0; --i)
         {
             var existing = _services[i];
 
-            if (newServicesMap.Remove(existing.Name, out var incoming))
+            if (newServicesMap.Remove(NameIdentity.Key(existing.Name), out var incoming))
             {
                 existing.UpdatePrice(incoming.Price);
             }
@@ -83,6 +84,7 @@ public sealed class Room
         IReadOnlyList<Guid> serviceIds,
         IReadOnlyList<BookingPricingRule> rules)
     {
+        nowUtc = UtcPrecision.Floor(nowUtc);
         DomainValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
         ArgumentNullException.ThrowIfNull(serviceIds, nameof(serviceIds));
         ArgumentNullException.ThrowIfNull(rules, nameof(rules));
@@ -114,7 +116,7 @@ public sealed class Room
     private static void ThrowIfServiceNamesNotUnique(IReadOnlyCollection<RoomServiceData> services, string parameterName)
     {
         if (services
-            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(x => NameIdentity.Key(x.Name), StringComparer.Ordinal)
             .Any(group => group.Count() > 1))
         {
             throw new ArgumentException("Service names must be unique within a room.", parameterName);

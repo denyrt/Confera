@@ -93,30 +93,31 @@ public sealed class BookingTests
     }
 
     [Fact]
-    public void Book_AllowsZeroRentalAndTotalAfterRounding()
+    public void Book_AllowsZeroShortSegmentAfterRounding()
     {
-        var room = new Room("Small rate", 1, 0.001m);
+        var room = new Room("Small segment", 1, 1000m);
 
-        var booking = room.Book(At(9), At(9, 30), At(9), [], [Rule("low", 9, 18, 0.1m)]);
+        var booking = room.Book(At(9), At(9, 30), At(9), [],
+            [Rule("day", 9, 18), new("edge", "Edge", new TimeOnly(9, 0), new TimeOnly(9, 0).Add(TimeSpan.FromTicks(10)), 0.5m, 20)]);
 
-        Assert.Equal(0m, booking.TotalPrice);
-        Assert.Equal(0m, Assert.Single(booking.PriceSegments).Price);
+        Assert.Equal(500m, booking.TotalPrice);
+        Assert.Equal(0m, booking.PriceSegments.First().Price);
     }
 
     [Fact]
     public void Book_AllowsShortSegmentsWithinValidBooking()
     {
-        var room = new Room("Room", 1, 60m);
+        var room = new Room("Room", 1, 1800m);
         BookingPricingRule[] rules =
         [
             new("first", "First", new TimeOnly(9, 0), new TimeOnly(9, 29), 1m, 0),
-            new("second", "Second", new TimeOnly(9, 29), new TimeOnly(10, 0), 1m, 0)
+            new("second", "Second", new TimeOnly(9, 29), new TimeOnly(10, 0), 1m, 1)
         ];
 
         var booking = room.Book(At(9), At(9, 30), At(9), [], rules);
 
-        Assert.Equal(new[] { 29m, 1m }, booking.PriceSegments.Select(x => x.Price));
-        Assert.Equal(30m, booking.TotalPrice);
+        Assert.Equal(new[] { 870m, 30m }, booking.PriceSegments.Select(x => x.Price));
+        Assert.Equal(900m, booking.TotalPrice);
     }
 
     [Theory]
@@ -148,8 +149,8 @@ public sealed class BookingTests
     public void Book_RejectsDurationJustOutsideBounds(int boundary)
     {
         var duration = boundary < 0
-            ? TimeSpan.FromMinutes(30).Subtract(TimeSpan.FromTicks(1))
-            : TimeSpan.FromHours(24).Add(TimeSpan.FromTicks(1));
+            ? TimeSpan.FromMinutes(30).Subtract(TimeSpan.FromTicks(10))
+            : TimeSpan.FromHours(24).Add(TimeSpan.FromTicks(10));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => CreateRoom().Book(At(10), At(10).Add(duration),
             At(9), [], InitialRules()));
@@ -158,7 +159,7 @@ public sealed class BookingTests
     [Fact]
     public void Book_RejectsPastStart()
     {
-        Assert.Throws<ArgumentException>(() => CreateRoom().Book(At(10), At(11), At(10).AddTicks(1), [], InitialRules()));
+        Assert.Throws<ArgumentException>(() => CreateRoom().Book(At(10), At(11), At(10).AddTicks(10), [], InitialRules()));
     }
 
     [Theory]

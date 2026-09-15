@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Npgsql.DisableDateTimeInfinityConversions" Value="true" />
+    <ProjectReference Include="../Confera.Infrastructure/Confera.Infrastructure.csproj" />
+    <ProjectReference Include="../../orchestration/Confera.ServiceDefaults/Confera.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>

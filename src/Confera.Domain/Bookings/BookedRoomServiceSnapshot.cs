@@ -17,6 +17,6 @@ public sealed class BookedRoomServiceSnapshot
         Id = Guid.CreateVersion7();
         BookingId = DomainValidation.RequireGuid(bookingId, nameof(bookingId));
         ServiceNameSnapshot = DomainValidation.RequireText(serviceNameSnapshot, 64, nameof(serviceNameSnapshot));
-        ServicePriceSnapshot = DomainValidation.RequireMoney(servicePriceSnapshot, nameof(servicePriceSnapshot));
+        ServicePriceSnapshot = DomainValidation.RequireServicePrice(servicePriceSnapshot, nameof(servicePriceSnapshot));
     }
 }

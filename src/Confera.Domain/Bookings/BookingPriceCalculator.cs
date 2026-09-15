@@ -9,7 +9,7 @@ public static class BookingPriceCalculator
         IReadOnlyList<BookingPricingRule> rules)
     {
         DomainValidation.RequireRentalPeriod(startsAtUtc, endsAtUtc);
-        DomainValidation.RequireMoney(hourlyRate, nameof(hourlyRate));
+        DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
         BookingPricingRule.ValidateSet(rules);
 
         var intervals = ExpandRules(startsAtUtc, endsAtUtc, rules);

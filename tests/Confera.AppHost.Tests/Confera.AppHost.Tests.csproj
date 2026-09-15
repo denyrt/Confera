@@ -1,28 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
     <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <RuntimeHostConfigurationOption Include="Npgsql.DisableDateTimeInfinityConversions" Value="true" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="SSH.NET" />
-    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="Confera.Testing" />
     <Compile Include="../Shared/PostgresFixture.cs" Link="Fixtures/PostgresFixture.cs" />
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Confera.Api\Confera.Api.csproj" />
-    <ProjectReference Include="..\..\src\Confera.Domain\Confera.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Confera.Infrastructure\Confera.Infrastructure.csproj" />
+    <ProjectReference Include="../../orchestration/Confera.AppHost/Confera.AppHost.csproj" />
+    <ProjectReference Include="../../src/Confera.Infrastructure/Confera.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Confera.MigrationWorker/Confera.MigrationWorker.csproj" />
+    <ProjectReference Include="../../src/Confera.Domain/Confera.Domain.csproj" />
   </ItemGroup>
-
 </Project>

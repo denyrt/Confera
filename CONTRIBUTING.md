@@ -64,7 +64,10 @@ branch protection is configured by this document.
 
 ## Local setup and validation
 
-Install a .NET SDK accepted by `global.json`. From the repository root:
+Install a .NET SDK accepted by `global.json` and run Docker with Linux containers.
+See [local development](docs/local-development.md) for connection settings,
+worker options, migration commands, isolation, and the scoped database reset.
+From the repository root:
 
 ```powershell
 dotnet tool restore
@@ -80,19 +83,28 @@ Microsoft.Testing.Platform in `global.json`; use its CLI syntax:
 dotnet test --solution Confera.slnx --configuration Release --no-build
 ```
 
-Domain behavioral tests are implemented. To run the relevant suite:
+Run every implemented suite explicitly, as CI does:
 
 ```powershell
 dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build
+dotnet test --project tests/Confera.Integration.Tests --configuration Release --no-build
+dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-build
 ```
 
-Application and Integration test projects still contain no tests. The runner
-reports `Zero tests ran` with exit code 8 for each empty project, so the solution
-test command currently fails. Do not suppress this result or add placeholder
-tests solely to make it green. A successful build or zero discovered tests is
-not evidence of tested application behavior. Add meaningful tests with behavior
-changes. Docker will be needed when container-backed tests are introduced;
-PostgreSQL and Testcontainers are not configured yet.
+Application.Tests still contains no tests. The runner reports `Zero tests ran`
+with exit code 8 for that project, so the solution test command currently fails.
+Do not suppress this result or add placeholder tests solely to make it green.
+A successful build or zero discovered tests is not evidence of tested application
+behavior. Add meaningful tests with behavior changes. Integration and AppHost
+suites require Docker and use PostgreSQL 18.6 with random ports and disposable
+resources. Normal integration tests migrate a unique empty database per test;
+seed scenarios opt in. Resource Reaper remains enabled.
+
+Add `--report-trx --results-directory artifacts/tests/<suite>` for TRX reports.
+The [P1 validation record](docs/p1-validation.md) contains actual commands and
+results. The GitHub Actions workflow restores/builds Release and invokes each
+implemented suite; failures remain failures. Test output and safe resource-state
+diagnostics are ignored locally and archived in CI.
 
 Before opening a PR, review `git diff` and `git status`, run `git diff --check`,
 build the solution, and run relevant tests. Include new source and configuration
@@ -165,16 +177,24 @@ point inward; Domain stays independent of EF Core, ASP.NET Core, and hosting.
 | Infrastructure | Application, Domain |
 | Api | Application, Infrastructure, ServiceDefaults |
 | ServiceDefaults | None within this solution |
-| AppHost | Api |
+| MigrationWorker | Infrastructure, ServiceDefaults |
+| AppHost | Api, MigrationWorker |
 | Domain.Tests | Domain |
 | Application.Tests | Application, Domain |
-| Integration.Tests | Api, Infrastructure |
+| Integration.Tests | Api, Infrastructure, Domain |
+| AppHost.Tests | AppHost, Infrastructure, MigrationWorker, Domain |
 
 Application owns use cases and the persistence contracts they need.
-Infrastructure implements these contracts and will own the EF Core context,
-database mappings, and migrations. API references Infrastructure to compose DI;
+Infrastructure owns the EF Core context, explicit mappings, versioned migrations,
+provider configuration and one-time initializer. It implements future Application
+persistence contracts as use cases require them. API references Infrastructure to compose DI;
 controllers should call Application use cases rather than access the context.
 AppHost orchestrates executable services and external resources.
+
+Shared container/database test fixtures are linked source under `tests/Shared`;
+they add no production dependency. Do not add EF annotations or hosting/provider
+references to Domain, mutable collection access for EF, or generic repositories
+before a use case needs an explicit contract.
 
 Project references make types available; they do not register services in DI.
 They also do not enforce every architectural boundary: SDK-style projects expose

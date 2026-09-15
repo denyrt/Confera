@@ -33,31 +33,31 @@ public sealed class BookingPriceCalculatorTests
     [Fact]
     public void Calculate_NightRuleIncludesItsPreviousDayOccurrence()
     {
-        var segments = BookingPriceCalculator.Calculate(At(1), At(2), 100m,
+        var segments = BookingPriceCalculator.Calculate(At(1), At(2), 1000m,
             [Rule("night", 22, 6, 0.8m)]);
 
-        AssertSegment(Assert.Single(segments), At(1), At(2), "night", 0.8m, 80m);
+        AssertSegment(Assert.Single(segments), At(1), At(2), "night", 0.8m, 800m);
     }
 
     [Fact]
     public void Calculate_CrossesMidnightAndSelectsNextDaysTariff()
     {
-        var segments = BookingPriceCalculator.Calculate(At(23), At(7).AddDays(1), 100m,
+        var segments = BookingPriceCalculator.Calculate(At(23), At(7).AddDays(1), 1000m,
             [Rule("night", 22, 6, 0.8m), Rule("morning", 6, 9, 0.9m)]);
 
         Assert.Collection(segments,
-            x => AssertSegment(x, At(23), At(6).AddDays(1), "night", 0.8m, 560m),
-            x => AssertSegment(x, At(6).AddDays(1), At(7).AddDays(1), "morning", 0.9m, 90m));
+            x => AssertSegment(x, At(23), At(6).AddDays(1), "night", 0.8m, 5600m),
+            x => AssertSegment(x, At(6).AddDays(1), At(7).AddDays(1), "morning", 0.9m, 900m));
     }
 
     [Fact]
     public void Calculate_AcceptsFullyCovered24Hours()
     {
-        var segments = BookingPriceCalculator.Calculate(At(10), At(10).AddDays(1), 100m,
+        var segments = BookingPriceCalculator.Calculate(At(10), At(10).AddDays(1), 1000m,
             [Rule("day", 9, 18), Rule("night", 18, 9, 0.8m)]);
 
         Assert.Equal(3, segments.Count);
-        Assert.Equal(2100m, segments.Sum(x => x.Price));
+        Assert.Equal(21000m, segments.Sum(x => x.Price));
         Assert.Equal(At(10), segments[0].StartsAtUtc);
         Assert.Equal(At(10).AddDays(1), segments[^1].EndsAtUtc);
     }
@@ -70,27 +70,27 @@ public sealed class BookingPriceCalculatorTests
         var end = endHour == 24 ? At(0).AddDays(1) : At(endHour);
 
         Assert.Throws<ArgumentException>(() =>
-            BookingPriceCalculator.Calculate(At(startHour), end, 100m, InitialRules()));
+            BookingPriceCalculator.Calculate(At(startHour), end, 1000m, InitialRules()));
     }
 
     [Fact]
     public void Calculate_RejectsGapInMiddle()
     {
-        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(15), 100m,
+        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(15), 1000m,
             [Rule("first", 9, 11), Rule("second", 12, 15)]));
     }
 
     [Fact]
     public void Calculate_RejectsEmptyRules()
     {
-        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(10), 100m, []));
+        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(10), 1000m, []));
     }
 
     [Fact]
     public void Calculate_RejectsInvalidRuleSetEvenOutsideBookingPeriod()
     {
-        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(10), 100m,
-            [Rule("day", 9, 18), Rule("first", 20, 23), Rule("second", 21, 22)]));
+        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(10), 1000m,
+            [Rule("day", 9, 18), Rule("first", 20, 23), Rule("second", 21, 22, 1m, 20)]));
     }
 
     [Fact]
@@ -105,10 +105,11 @@ public sealed class BookingPriceCalculatorTests
     [Fact]
     public void Calculate_RoundsMidpointAwayFromZero()
     {
-        var segment = Assert.Single(BookingPriceCalculator.Calculate(At(9), At(9, 30), 0.001m,
-            [Rule("day", 9, 18)]));
+        var segments = BookingPriceCalculator.Calculate(At(9), At(9, 30), 1800m,
+            [Rule("day", 9, 18), new("edge", "Edge", new TimeOnly(9, 0), new TimeOnly(9, 0).Add(TimeSpan.FromMilliseconds(1)), 1m, 20)]);
 
-        Assert.Equal(0.001m, segment.Price);
+        Assert.Equal(0.001m, segments[0].Price);
+        Assert.Equal(900.001m, segments.Sum(x => x.Price));
     }
 
     [Fact]
@@ -117,21 +118,21 @@ public sealed class BookingPriceCalculatorTests
         BookingPricingRule[] rules =
         [
             new("first", "First", new TimeOnly(9, 0), new TimeOnly(9, 10), 1m, 0),
-            new("second", "Second", new TimeOnly(9, 10), new TimeOnly(9, 20), 1m, 0),
-            new("third", "Third", new TimeOnly(9, 20), new TimeOnly(10, 0), 1m, 0)
+            new("second", "Second", new TimeOnly(9, 10), new TimeOnly(9, 20), 1m, 1),
+            new("third", "Third", new TimeOnly(9, 20), new TimeOnly(10, 0), 1m, 2)
         ];
 
-        var segments = BookingPriceCalculator.Calculate(At(9), At(9, 30), 0.001m, rules);
+        var segments = BookingPriceCalculator.Calculate(At(9), At(9, 30), 1000m, rules);
 
         Assert.Equal(3, segments.Count);
-        Assert.All(segments, x => Assert.Equal(0m, x.Price));
-        Assert.Equal(0m, segments.Sum(x => x.Price));
+        Assert.All(segments, x => Assert.Equal(166.667m, x.Price));
+        Assert.Equal(500.001m, segments.Sum(x => x.Price));
     }
 
     [Fact]
     public void Calculate_SplitsAtLowerPriorityRuleBoundaries()
     {
-        var segments = BookingPriceCalculator.Calculate(At(10), At(12), 100m,
+        var segments = BookingPriceCalculator.Calculate(At(10), At(12), 1000m,
             [Rule("winner", 9, 18, 1m, 2), Rule("lower", 11, 14, 0.8m, 1)]);
 
         Assert.Equal(2, segments.Count);
@@ -148,16 +149,16 @@ public sealed class BookingPriceCalculatorTests
             ? new DateTime(9999, 12, 31, 23, 0, 0, DateTimeKind.Utc)
             : new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var segment = Assert.Single(BookingPriceCalculator.Calculate(start, start.AddMinutes(30), 100m,
+        var segment = Assert.Single(BookingPriceCalculator.Calculate(start, start.AddMinutes(30), 1000m,
             [Rule("night", 22, 6)]));
 
-        Assert.Equal(50m, segment.Price);
+        Assert.Equal(500m, segment.Price);
     }
 
     [Fact]
     public void Calculate_ReturnsReadOnlySegments()
     {
-        var segments = BookingPriceCalculator.Calculate(At(9), At(10), 100m, InitialRules());
+        var segments = BookingPriceCalculator.Calculate(At(9), At(10), 1000m, InitialRules());
 
         Assert.Throws<NotSupportedException>(() => ((IList<BookingRentalSegment>)segments).Clear());
     }

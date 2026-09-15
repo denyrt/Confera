@@ -5,13 +5,11 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
-This section describes D1's currently implemented behavior. P1's approved
-changes below are still planned; updating the decisions does not imply that
-the existing code already enforces them.
+This section describes D1 plus the P1 persistence and validation implementation.
 
 | Model | Responsibility |
 | --- | --- |
-| `Room` | Room identity, name, capacity, hourly rate, and available services. |
+| `Room` | Room identity, name, capacity, hourly rate, current services, and minimal `IsDeleted` state. |
 | `RoomService` | A service offered by a specific room, with its own identity and price. |
 | `Booking` | Booking interval and creation time in UTC, room reference, pricing snapshots, and total price. |
 | `BookingPricingRule` | A daily time interval, multiplier, and priority used to determine pricing and bookable hours. |
@@ -26,18 +24,20 @@ names ignoring case, and preserves existing service IDs when names match.
 Booking-input validation requires UTC timestamps, a duration of 30 minutes to
 24 hours inclusive, and a start that is not before the supplied current time.
 Selected service IDs must be unique and belong to the room; an empty selection
-is allowed. Room rates and service prices must be positive and have at most
-three fractional digits; trailing decimal zeros do not count as extra precision.
+is allowed. Room rates are 1,000–100,000 UAH and service prices 200–20,000 UAH,
+inclusive, with at most three fractional digits. Multipliers are 0.50–2.00 with
+at most two digits; trailing zeros do not count as extra precision. External
+times must be whole microseconds; `Room.Book` floors its UTC clock input once
+before checking the start and recording creation time.
 
 `BookingPriceCalculator.Calculate(...)` returns immutable rental segments,
 selecting the highest-priority rule at each boundary. It requires full tariff
 coverage, handles daily rules crossing midnight, and rounds each segment to
 three fractional digits using `MidpointRounding.AwayFromZero`.
 
-`BookingPricingRule.ValidateSet(...)` rejects equal-priority rules whose daily
-intervals overlap, including across midnight. Disjoint and adjacent rules may
-share a priority. This validates the entire supplied configuration, even when
-the conflicting rules do not intersect the requested booking.
+`BookingPricingRule.ValidateSet(...)` rejects every duplicate priority in the
+complete configuration, including disjoint, adjacent or masked rules and rules
+outside the booking. The database unique constraint protects concurrent writes.
 
 `Room.Book(...)` selects the current services, calculates rental segments, and
 returns a complete `Booking`. Booking generates its ID before creating its own
@@ -54,32 +54,42 @@ application and infrastructure layers.
 ## Intended behavior and remaining work
 
 Snapshots keep confirmed booking prices independent of later changes to room
-rates, services, or pricing rules. Domain tests verify this behavior; persistence
-and reporting over those snapshots remain to be implemented.
+rates, services, or pricing rules. Domain and real PostgreSQL round-trip tests
+verify this behavior. Reporting over snapshots remains Q1.
 
 Application use cases will coordinate availability checks and persistence.
-Infrastructure must provide protection against concurrent overlapping bookings;
-input validation alone cannot provide this guarantee. The agreed persistence
-approach is a short transaction locking the room row for booking and room-change
-operations, plus a PostgreSQL exclusion constraint on room ID and the half-open
-booking interval. Tariff priorities will be globally unique in Domain and
-persistence, replacing D1's allowance for disjoint equal-priority rules.
+Infrastructure enforces a PostgreSQL exclusion constraint on room ID and the
+half-open booking interval, including writes on independent connections. B1/R1
+will add the agreed short transaction locking the room row for booking and
+room-change operations. P1 does not implement those application use cases.
 
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.
 
 The current models do not yet enforce all these decisions. Remaining work
-includes active-room name uniqueness, room soft-delete, and restrictions on
-capacity reduction and deletion when ongoing or future bookings exist. Service
+includes soft-delete operations and restrictions on capacity reduction and
+deletion when ongoing or future bookings exist. Active-room name uniqueness
+and soft-delete storage are implemented. Service
 renaming is allowed by the agreed policy; the current collection replacement
 matches services by name rather than providing a dedicated rename operation.
 
-The [complete P1 specification](p1-persistence-specification.md) includes minimal
+The [P1 implementation](p1-persistence-specification.md) includes minimal
 `Room.IsDeleted` state, normalized active-room/service name integrity, inclusive
 rate/service/multiplier bounds, microsecond time precision, unique priorities,
 EF mappings/migrations, MigrationWorker and isolated real-database tests.
 Lifecycle operations and booking-dependent room restrictions remain R1.
 Room continues to own services without a `Room.Bookings` navigation.
+
+EF rehydrates aggregates through private constructors and backing collections.
+Service removal does not cascade to historical snapshots; physical deletion of
+a booked room is restricted. SQL checks enforce per-row ranges and precision,
+names, IDs, durations, and foreign keys. Complete segment coverage and total
+equality remain Domain invariants, not independently proven by SQL row checks.
+
+Name identity trims the explicit whitespace set and uses PostgreSQL 18 simple
+uppercase, including the runtime compatibility mappings documented in
+[local development](local-development.md#name-normalization). Keys are generated
+by the database and compared with the `C` collation.
 
 ## API and application scope
 

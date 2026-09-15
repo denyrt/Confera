@@ -6,9 +6,10 @@ namespace Confera.Domain.Tests;
 public sealed class BookingPricingRuleTests
 {
     [Fact]
-    public void ValidateSet_AcceptsAdjacentAndDisjointRulesWithSamePriority()
+    public void ValidateSet_RejectsAdjacentAndDisjointRulesWithSamePriority()
     {
-        BookingPricingRule.ValidateSet([Rule("first", 6, 9), Rule("second", 9, 18), Rule("third", 20, 23)]);
+        Assert.Throws<ArgumentException>(() => BookingPricingRule.ValidateSet(
+            [Rule("first", 6, 9, 1m, -2), Rule("second", 9, 18, 1m, -2), Rule("third", 20, 23)]));
     }
 
     [Fact]
@@ -29,7 +30,7 @@ public sealed class BookingPricingRuleTests
     public void ValidateSet_RejectsSamePriorityOverlap(int firstStart, int firstEnd, int secondStart, int secondEnd)
     {
         Assert.Throws<ArgumentException>(() => BookingPricingRule.ValidateSet(
-            [Rule("first", firstStart, firstEnd), Rule("second", secondStart, secondEnd)]));
+            [Rule("first", firstStart, firstEnd, 1m, 0), Rule("second", secondStart, secondEnd, 1m, 0)]));
     }
 
     [Fact]
@@ -56,8 +57,8 @@ public sealed class BookingPricingRuleTests
     {
         BookingPricingRule.ValidateSet(
         [
-            new("last-tick", "Last tick", TimeOnly.MaxValue, TimeOnly.MinValue, 1m, 0),
-            new("rest-of-day", "Rest of day", TimeOnly.MinValue, TimeOnly.MaxValue, 1m, 0)
+            new("last-microsecond", "Last microsecond", new TimeOnly(TimeOnly.MaxValue.Ticks - 9), TimeOnly.MinValue, 1m, 0),
+            new("rest-of-day", "Rest of day", TimeOnly.MinValue, new TimeOnly(TimeOnly.MaxValue.Ticks - 9), 1m, 1)
         ]);
     }
 
@@ -65,7 +66,7 @@ public sealed class BookingPricingRuleTests
     public void ValidateSet_RejectsSamePriorityOverlapEvenIfHigherRuleMasksIt()
     {
         Assert.Throws<ArgumentException>(() => BookingPricingRule.ValidateSet(
-            [Rule("first", 9, 18), Rule("second", 12, 14), Rule("higher", 9, 18, 1m, 2)]));
+            [Rule("first", 9, 18, 1m, 0), Rule("second", 12, 14, 1m, 0), Rule("higher", 9, 18, 1m, 2)]));
     }
 
     [Fact]

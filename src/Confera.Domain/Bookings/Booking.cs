@@ -42,14 +42,14 @@ public sealed class Booking
         StartsAtUtc = startsAtUtc;
         EndsAtUtc = endsAtUtc;
         CreatedAtUtc = nowUtc;
-        HourlyRateSnapshot = DomainValidation.RequireMoney(hourlyRateSnapshot, nameof(hourlyRateSnapshot));
+        HourlyRateSnapshot = DomainValidation.RequireHourlyRate(hourlyRateSnapshot, nameof(hourlyRateSnapshot));
 
         _services.AddRange(services.Select(x => new BookedRoomServiceSnapshot(Id, x.Name, x.Price)));
         _priceSegments.AddRange(priceSegments.Select(x => new BookingPriceSegment(Id, x)));
 
         var rentalPrice = _priceSegments.Sum(x => x.Price);
         var servicePrice = _services.Sum(x => x.ServicePriceSnapshot);
-        TotalPrice = DomainValidation.RequireNonNegative(rentalPrice + servicePrice, nameof(TotalPrice));
+        TotalPrice = DomainValidation.RequireTotal(rentalPrice + servicePrice, nameof(TotalPrice));
     }
 
     private static void RequireContinuousCoverage(

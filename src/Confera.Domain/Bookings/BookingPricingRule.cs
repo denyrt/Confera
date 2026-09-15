@@ -32,13 +32,13 @@ public sealed class BookingPricingRule
         Id = Guid.CreateVersion7();
         Code = DomainValidation.RequireText(code, 64, nameof(code));
         Name = DomainValidation.RequireText(name, 64, nameof(name));
-        StartsAt = startsAt;
-        EndsAt = endsAt;
-        Multiplier = DomainValidation.RequirePositive(multiplier, nameof(multiplier));
+        StartsAt = DomainValidation.RequireDailyTime(startsAt, nameof(startsAt));
+        EndsAt = DomainValidation.RequireDailyTime(endsAt, nameof(endsAt));
+        Multiplier = DomainValidation.RequireMultiplier(multiplier, nameof(multiplier));
         Priority = priority;
     }
 
-    /// <summary>Rules with the same priority may only cover disjoint daily intervals.</summary>
+    /// <summary>Every rule in the complete configuration has a unique priority.</summary>
     public static void ValidateSet(IReadOnlyList<BookingPricingRule> rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
@@ -48,57 +48,9 @@ public sealed class BookingPricingRule
             ArgumentNullException.ThrowIfNull(rule, nameof(rules));
         }
 
-        for (var i = 0; i < rules.Count; i++)
+        if (rules.Select(rule => rule.Priority).Distinct().Count() != rules.Count)
         {
-            for (var j = i + 1; j < rules.Count; j++)
-            {
-                var firstRule = rules[i];
-                var secondRule = rules[j];
-
-                if (firstRule.Priority == secondRule.Priority && Overlaps(firstRule, secondRule))
-                {
-                    throw new ArgumentException("Overlapping pricing rules must have different priorities.", nameof(rules));
-                }
-            }
+            throw new ArgumentException("Pricing rule priorities must be globally unique.", nameof(rules));
         }
-    }
-
-    private static bool Overlaps(BookingPricingRule first, BookingPricingRule second)
-    {
-        foreach (var firstInterval in first.GetDailyIntervals())
-        {
-            foreach (var secondInterval in second.GetDailyIntervals())
-            {
-                if (firstInterval.Overlaps(secondInterval))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private IEnumerable<DailyInterval> GetDailyIntervals()
-    {
-        if (StartsAt < EndsAt)
-        {
-            yield return new DailyInterval(StartsAt.Ticks, EndsAt.Ticks);
-            yield break;
-        }
-
-        // For example, 22:00-06:00 becomes [22:00, 24:00) and [00:00, 06:00).
-        yield return new DailyInterval(StartsAt.Ticks, TimeSpan.TicksPerDay);
-
-        if (EndsAt > TimeOnly.MinValue)
-        {
-            yield return new DailyInterval(0, EndsAt.Ticks);
-        }
-    }
-
-    private readonly record struct DailyInterval(long StartsAtTicks, long EndsAtTicks)
-    {
-        public bool Overlaps(DailyInterval other) =>
-            StartsAtTicks < other.EndsAtTicks && EndsAtTicks > other.StartsAtTicks;
     }
 }

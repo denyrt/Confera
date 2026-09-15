@@ -1,10 +1,10 @@
 # P1: PostgreSQL persistence specification
 
-Status: agreed specification; implementation remains **Planned**. Prepared on
-2026-09-15. This document is the complete implementation assignment for roadmap
-P1. It records the decisions approved during planning and an ordered execution
-plan. Implementation starts after explicit approval of this specification and
-its ordered plan; approval to edit documentation alone does not authorize it.
+Status: approved specification and implementation plan; implementation Verified,
+local and unmerged, on 2026-09-15.
+Prepared and approved for implementation on 2026-09-15. This document is the
+complete acceptance contract for P1. See the [validation record](p1-validation.md)
+and [roadmap](implementation-roadmap.md) for actual implementation evidence.
 
 Read this with [repository conventions](../CONTRIBUTING.md), the
 [agent workflow](agent-workflow.md), [domain model](domain-model.md),
@@ -345,8 +345,8 @@ test results, generated build output, and local connection values untracked.
 
 ## Ordered implementation plan
 
-This plan is ready for the user's explicit implementation approval. Execution
-does not require rediscovering decisions already settled in this specification.
+The user explicitly approved this complete plan for implementation on 2026-09-15.
+Execution does not require rediscovering decisions already settled here.
 
 1. Read required repository sources and this specification; inspect the current
    code, working tree, toolchain, and Docker availability. Report only material

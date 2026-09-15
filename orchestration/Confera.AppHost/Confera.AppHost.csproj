@@ -3,10 +3,15 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AspireUseCliBundle>true</AspireUseCliBundle>
+    <!-- Run the selected .NET configuration directly. Aspire 13.5's CLI run
+         hook otherwise reselects an existing project instance/configuration. -->
+    <ASPIRE_SUPPRESS_CLI_RUN_HOOK>true</ASPIRE_SUPPRESS_CLI_RUN_HOOK>
     <UserSecretsId>896a0219-3703-4cff-a612-9c2306ecc35a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <ProjectReference Include="..\..\src\Confera.MigrationWorker\Confera.MigrationWorker.csproj" />
     <ProjectReference Include="..\..\src\Confera.Api\Confera.Api.csproj" />
   </ItemGroup>
 

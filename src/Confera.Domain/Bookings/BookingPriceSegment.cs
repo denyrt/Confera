@@ -27,6 +27,6 @@ public sealed class BookingPriceSegment
         PricingCodeSnapshot = segment.PricingCode;
         MultiplierSnapshot = segment.Multiplier;
         HourlyRateSnapshot = segment.HourlyRate;
-        Price = DomainValidation.RequireNonNegative(segment.Price, nameof(segment.Price));
+        Price = DomainValidation.RequireSegmentPrice(segment.Price, nameof(segment.Price));
     }
 }

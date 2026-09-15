@@ -1,6 +1,10 @@
+using Confera.Infrastructure.Persistence;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.Services.AddConferaPersistence(builder.Configuration);
+builder.Services.AddConferaDatabaseHealth();
 
 // Add services to the container.
 

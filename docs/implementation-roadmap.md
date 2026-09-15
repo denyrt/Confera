@@ -35,7 +35,7 @@ alongside their corresponding application use cases.
 | --- | --- | --- | --- |
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
-| P1 | PostgreSQL persistence and infrastructure foundation | Planned | Decisions resolved on 2026-09-15; [complete specification and execution plan](p1-persistence-specification.md) prepared. Implementation has not started. |
+| P1 | PostgreSQL persistence and infrastructure foundation | Verified | Local `feature/postgres-persistence`, 2026-09-15: full acceptance matrix passed; Release builds without warnings, 88 Domain + 14 PostgreSQL + 12 AppHost/worker tests passed on both Windows and Linux. [Commands and evidence](p1-validation.md). Not merged. |
 | B1 | Transactional booking application use case | Planned | Depends on P1. |
 | R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
@@ -57,14 +57,14 @@ Completed behavior:
   documented.
 
 Evidence: [domain tests](../tests/Confera.Domain.Tests/), PR #4 and the validation
-record in the delivery table. Application and Integration test projects remain
-empty; CI, availability checks, and concurrent-booking protection are not part of
+record in the delivery table. At D1 delivery, Application and Integration tests were
+empty; CI, availability checks, and concurrent-booking protection were not part of
 this completed domain task. Room lifecycle changes remain under R1.
 
 P1's approved specification changes numerical bounds, time precision, name
 comparison, and tariff priorities. The equal-priority statement above records
-D1's delivered behavior; it is not the new target policy or a claim that P1's
-changes are already implemented.
+D1's delivered behavior. P1 now enforces globally unique priorities, including
+disjoint rules, as recorded in its separate validation evidence.
 
 ### W1: Implementation roadmap and shared maintenance process
 
@@ -133,8 +133,26 @@ verified within the specification. New material incompatibilities must be
 surfaced rather than silently changing this contract.
 
 Planning result: the specification and ordered implementation plan are prepared;
-P1 stays Planned. Planning-document verification does not establish persistence
-delivery. Publication of implementation changes is a separate user request.
+that planning result alone did not establish persistence delivery. The user has
+since approved the specification and its ordered execution plan. Actual P1
+implementation validation is recorded in [P1 evidence](p1-validation.md).
+Publication of implementation changes is a separate user request.
+
+Implementation verified on 2026-09-15: all P1 acceptance rows passed on Windows
+and Linux, including independent concurrent SQL writes, seed rollback/replay,
+real worker retry/deadline/failure gating, first startup, container recreation,
+Unicode scalar conformance and local/test coexistence. Each environment passed
+114 implemented tests with no skips. Release builds had no warnings/errors;
+EF found no pending model changes. Application.Tests still reports zero tests
+and MTP exit 8, as required until B1. Local startup/EF commands, documentation
+links, solution paths and diff checks passed. CI's Linux sequence passed locally;
+a hosted Actions run and merge await publication. See the complete
+[P1 validation record](p1-validation.md); this establishes Verified, not Done.
+
+Subsequent NameIdentity refinement on the same date adds explicit null guards
+and UTF-16 span appending without per-Rune boxing/string conversion. Windows
+regression checks passed: 90 Domain tests and full PostgreSQL Unicode key
+conformance; details and commands are appended to the P1 validation record.
 
 Planning validation on 2026-09-15: tools/package restore succeeded; Release
 build passed with no warnings or errors; all 70 existing Domain tests passed;

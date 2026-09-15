@@ -1,0 +1,60 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore tools and packages
+        run: |
+          dotnet tool restore
+          dotnet restore Confera.slnx
+      - name: Trust development HTTPS certificate for AppHost projects
+        run: |
+          export SSL_CERT_DIR="$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs"
+          echo "SSL_CERT_DIR=$SSL_CERT_DIR" >> "$GITHUB_ENV"
+          dotnet dev-certs https --trust
+      - name: Build Release
+        run: dotnet build Confera.slnx --configuration Release --no-restore
+      - name: Check migration model
+        env:
+          ConnectionStrings__confera: Host=localhost;Database=design_time_only
+        run: dotnet ef migrations has-pending-model-changes --project src/Confera.Infrastructure --configuration Release --no-build
+      - name: Domain tests
+        run: dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/domain
+      - name: PostgreSQL integration tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/Confera.Integration.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/integration
+      - name: AppHost and worker tests
+        if: ${{ !cancelled() }}
+        run: dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/apphost
+      - name: Safe Docker diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts/diagnostics
+          docker version > artifacts/diagnostics/docker-version.txt 2>&1
+          docker ps -a --format '{{.ID}} {{.Image}} {{.Names}} {{.Status}}' > artifacts/diagnostics/docker-resources.txt 2>&1
+      - name: Archive test results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
