@@ -42,7 +42,7 @@ alongside their corresponding application use cases.
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
-| B1 | Transactional booking application use case | Verified | Unmerged on feature/booking-creation, 2026-09-16. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
+| B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
 | R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
 | H1 | Complete the five business API operations | In progress | POST /bookings is included in B1; the remaining four operations follow R1 and A1. |
@@ -203,10 +203,15 @@ EF model check, OpenAPI/Swagger HTTP checks, documentation links/solution items,
 and diff checks passed. Application.Tests is now part of CI. See the
 [command and evidence record](b1-booking-implementation-plan.md#9-implementation-and-validation-record).
 
-The implementation remains unmerged on `feature/booking-creation`; no push or PR
-has been made. Hosted Linux Actions results await publication. R1, A1, reports,
-and the remaining H1 operations are outside this delivery. After merge, confirm
-the merge and relevant validation before changing B1 to Done.
+Completion recorded on 2026-09-16 at the maintainer's request: after
+`git fetch origin`, both local `main` and `origin/main` resolve to
+`1e6b96e396d8473209a75e5f3a7e3cb491306940`, the squash merge of
+[PR #8](https://github.com/denyrt/Confera/pull/8). The saved TRX reports confirm
+all 167 local tests passed. Documentation links, solution paths, and diff checks
+passed for this status update; application behavior did not change. Hosted
+Linux Actions results were not verified in this update. The B1 plan preserves
+the earlier pre-merge validation record; this roadmap records final delivery.
+R1, A1, reports, and the remaining H1 operations are outside this delivery.
 
 ### R1: Room management and lifecycle restrictions
 
