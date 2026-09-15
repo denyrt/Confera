@@ -6,7 +6,8 @@ The project covers conference room management, availability search, bookings, re
 
 ## Project status
 
-Domain booking creation and PostgreSQL persistence are implemented. Bookings
+Transactional booking creation through `POST /bookings`, Domain pricing, and
+PostgreSQL persistence are implemented. Bookings
 preserve UTC microsecond instants, rounded tariff segments, selected services,
 and prices as historical snapshots. PostgreSQL enforces active room/service
 name integrity, globally unique tariff priorities, and concurrent booking
@@ -18,9 +19,15 @@ data survives container recreation in the `confera-postgres-dev` volume.
 The worker has bounded retries, a 120-second operation deadline, and a non-zero
 result for incomplete or failed initialization.
 
-Application use cases, the five business API operations, reports, and room
-lifecycle restrictions remain planned. `Room.IsDeleted` and the filtered unique
-name index exist; the deletion operation and booking-dependent guards remain R1.
+The booking use case locks the room, reads its current services and tariffs,
+checks availability, and commits the complete booking atomically. It rejects
+absent/deleted rooms and returns stable HTTP errors. Development Swagger UI
+documents the operation and its price breakdown.
+
+Room creation/editing/deletion, availability search, and both reports remain
+planned. `Room.IsDeleted` and active-name uniqueness exist; deletion and its
+booking-dependent guards remain R1. The roadmap records delivery and validation
+status separately from implemented behavior.
 
 The original requirements and project decisions are documented separately:
 
@@ -29,6 +36,7 @@ The original requirements and project decisions are documented separately:
 - [Booking, pricing, room changes, and deletion rules](docs/booking-and-pricing-rules.md).
 - [Implementation roadmap, task status, and completion criteria](docs/implementation-roadmap.md).
 - [Complete P1 persistence specification and implementation plan](docs/p1-persistence-specification.md).
+- [Approved B1 booking implementation plan and API contract](docs/b1-booking-implementation-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/p1-validation.md).
 
@@ -50,13 +58,27 @@ dotnet build Confera.slnx --configuration Release --no-restore
 dotnet run --project orchestration/Confera.AppHost --configuration Release --no-build
 ```
 
-Use the dashboard resource links for `/health`, `/alive`, and development
-OpenAPI. The API has no business endpoints yet. Local initialization creates
+Use the dashboard's API resource link for `/swagger`, `/openapi/v1.json`,
+`/health`, and `/alive`. Local initialization creates
 Room A/B/C, six room-specific service offerings, and four tariffs once. Later
 starts preserve edits and deletions.
 
+`POST /bookings` requires `roomId`, `start`, `end`, and `serviceIds` (`[]` is
+allowed). Timestamps require `Z` or an explicit offset, normalize to UTC, and
+must have whole-microsecond precision. A successful response is `201` with the
+booking ID, UAH total, rental segments, and recorded services. For the original
+Room A data, 11:00-15:00 UTC with Projector and Wi-Fi costs 9,400 UAH.
+See the [booking example and ID lookup](docs/local-development.md#try-a-booking)
+and [HTTP request file](src/Confera.Api/Confera.Api.http).
+
+Overlaps return `409`; adjacent bookings are allowed. Booking writes have no
+automatic retries or idempotency keys. A lost response may follow a successful
+commit, so repeating the same request can return a conflict. This demonstration
+API has no authentication, payments, or public booking retrieval/cancellation.
+
 ```powershell
 dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build
+dotnet test --project tests/Confera.Application.Tests --configuration Release --no-build
 dotnet test --project tests/Confera.Integration.Tests --configuration Release --no-build
 dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-build
 ```
@@ -64,8 +86,8 @@ dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-b
 These are Microsoft.Testing.Platform commands. Database tests use disposable
 containers and a fresh database per scenario, without local development volumes.
 CI runs the implemented suites on Linux and archives TRX and safe diagnostics.
-`Application.Tests` remains empty until B1: the solution-wide test command reports
-`Zero tests ran`/exit 8 for that project. This result is not suppressed.
+All four test projects now contain implemented tests. HTTP tests use the real
+API pipeline and isolated PostgreSQL databases; application clocks are controlled.
 
 ## Contributing
 

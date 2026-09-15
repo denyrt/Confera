@@ -16,8 +16,9 @@ dotnet run --project orchestration/Confera.AppHost --configuration Release --no-
 ```
 
 Open the dashboard URL printed by AppHost and use its API resource endpoint.
-The development API exposes `/health`, `/alive`, and `/openapi/v1.json`.
-There are no business controllers yet. Stop AppHost with Ctrl+C.
+The development API exposes `/health`, `/alive`, `/openapi/v1.json`, and Swagger
+UI at `/swagger`. `POST /bookings` is the first business endpoint. Stop AppHost
+with Ctrl+C.
 
 The default launch profile uses HTTPS and the local ASP.NET development
 certificate. Create and trust it explicitly on a clean SDK installation,
@@ -85,6 +86,56 @@ infinity conversions before provider initialization. The design-time factory
 also sets the switch before creating its provider options. Finite UTC minimum
 and maximum microsecond instants are verified by a real database round trip.
 
+## Try a booking
+
+Open the API's `/swagger` page. Obtain the room and service IDs from the local
+database using an SQL client connected through the Aspire database resource.
+Until A1 exposes availability and current offerings, this read-only query gives
+the IDs needed by the request:
+
+```sql
+SELECT r."Id" AS "RoomId", r."Name" AS "RoomName", r."HourlyRate",
+       s."Id" AS "ServiceId", s."Name" AS "ServiceName", s."Price"
+FROM "Rooms" r
+LEFT JOIN "RoomServices" s ON s."RoomId" = r."Id"
+WHERE NOT r."IsDeleted"
+ORDER BY r."Name", s."Name";
+```
+
+Use a future, available date; replace the example identifiers with actual IDs.
+The [HTTP request file](../src/Confera.Api/Confera.Api.http) supplies the same
+example with editable variables. With the original Room A seed values:
+
+```json
+{
+  "roomId": "<Room A ID>",
+  "start": "2030-01-15T11:00:00Z",
+  "end": "2030-01-15T15:00:00Z",
+  "serviceIds": ["<Projector ID>", "<Wi-Fi ID>"]
+}
+```
+
+`201 Created` returns bookingId, roomId, UTC start/end, currency `UAH`,
+totalPrice `9400`, segments priced `2000`, `4600`, `2000`, and services priced
+`500` and `300`. Sending `serviceIds: []` is valid and totals `8600` for this
+example. Missing/null serviceIds is invalid. Dates require Z or an explicit
+offset; values finer than a microsecond are rejected before parsing can hide
+the extra precision. Additional trailing zero fractional digits are accepted
+within the standard JSON timestamp parser's supported format.
+
+Expected errors use `application/problem+json` with status, title, detail, code,
+and traceId. Invalid requests/periods/services or uncovered tariff hours return
+400, absent/deleted rooms return 404, and overlaps return 409. Recognized
+temporary database failures/timeouts return 503; unexpected failures return
+500 without internal details. The
+[B1 contract](b1-booking-implementation-plan.md#errors) lists the stable codes.
+
+Booking writes do not automatically retry and do not support idempotency keys.
+A failed/lost response may follow a successful commit. Repeating a successful
+booking request returns 409, not the previous confirmation. Use a different
+available period for another demo booking. The API has no authentication or
+public retrieval/cancellation operations in the agreed assignment scope.
+
 ## Worker and demo initialization
 
 Standalone worker runs always apply migrations. `DemoSeed:Enabled` defaults to
@@ -150,14 +201,18 @@ Use Microsoft.Testing.Platform syntax, not VSTest `--filter` or `--logger`:
 
 ```powershell
 dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/domain
+dotnet test --project tests/Confera.Application.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/application
 dotnet test --project tests/Confera.Integration.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/integration
 dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/apphost
 ```
 
 For a focused run, use e.g. `--filter-method '*FreshStartup*'`. The worker deadline
 test intentionally waits approximately 120 seconds. Give the full AppHost suite
-several minutes. `Application.Tests` is empty until B1; a solution-wide test run
-therefore reports exit 8 for that project. Do not hide or replace that result.
+several minutes. All four projects contain implemented tests, so the
+solution-wide command can also run them. HTTP booking tests use
+WebApplicationFactory with a real isolated database and a controlled clock.
+Concurrent scenarios coordinate independent connections and observe actual
+PostgreSQL blocking rather than assuming a race from elapsed time.
 
 Each database-test assembly owns one disposable Testcontainers PostgreSQL 18.6
 container, uses random ports and no reuse, and leaves Resource Reaper enabled.
@@ -237,3 +292,7 @@ extension 2.1.0 with existing xUnit v3 MTP package 4.0.0. Versions live centrall
 in `Directory.Packages.props`. Test projects explicitly pin SSH.NET 2026.0.0 to
 replace Testcontainers' vulnerable 2025.1.0 transitive dependency
 ([upstream advisory](https://github.com/sshnet/SSH.NET/security/advisories/GHSA-q939-rpr3-3284)).
+
+B1 adds Swashbuckle.AspNetCore.SwaggerUI 10.2.3 with the existing OpenAPI
+generator, Microsoft.AspNetCore.Mvc.Testing 10.0.12 for HTTP tests, and the same
+TRX reporter to Application.Tests. It introduces no schema migration.

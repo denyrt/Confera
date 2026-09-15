@@ -1,0 +1,43 @@
+using Confera.Application.Bookings;
+using Confera.Domain.Bookings;
+using Microsoft.AspNetCore.Diagnostics;
+
+namespace Confera.Api.Errors;
+
+internal sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExceptionHandler
+{
+    public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken cancellationToken)
+    {
+        if (context.RequestAborted.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        var (status, code, detail) = exception switch
+        {
+            BookingValidationException { Error: BookingValidationError.InvalidPeriod } error =>
+                (400, "invalid_booking_period", error.Message),
+            BookingValidationException { Error: BookingValidationError.InvalidServiceSelection } error =>
+                (400, "invalid_service_selection", error.Message),
+            BookingValidationException { Error: BookingValidationError.MissingTariffCoverage } error =>
+                (400, "tariff_coverage_missing", error.Message),
+            BookingOperationException { Failure: BookingFailure.InvalidRequest } =>
+                (400, "invalid_request", "Supply a nonempty room ID."),
+            BookingOperationException { Failure: BookingFailure.RoomNotFound } =>
+                (404, "room_not_found", "The room was not found."),
+            BookingOperationException { Failure: BookingFailure.RoomUnavailable } =>
+                (409, "room_unavailable", "The room is already booked for part of this period."),
+            BookingOperationException { Failure: BookingFailure.PersistenceUnavailable } =>
+                (503, "booking_persistence_unavailable", "The booking result could not be confirmed. A failed response does not prove that no booking was saved."),
+            _ => (500, "internal_error", "The request could not be completed.")
+        };
+
+        if (status >= 500)
+        {
+            logger.LogError(exception, "Request {TraceId} failed with {Code}.", context.TraceIdentifier, code);
+        }
+
+        await Results.Problem(ApiProblems.Create(context, status, code, detail)).ExecuteAsync(context);
+        return true;
+    }
+}

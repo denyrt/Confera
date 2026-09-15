@@ -42,10 +42,10 @@ alongside their corresponding application use cases.
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
-| B1 | Transactional booking application use case | Planned | Depends on P1. |
+| B1 | Transactional booking application use case | Verified | Unmerged on feature/booking-creation, 2026-09-16. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
 | R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
-| H1 | Complete the five business API operations | Planned | Built alongside B1, R1, and A1. |
+| H1 | Complete the five business API operations | In progress | POST /bookings is included in B1; the remaining four operations follow R1 and A1. |
 | Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
 
 ### D1: Domain booking creation and tariff pricing
@@ -179,6 +179,10 @@ registration, and diff whitespace checks passed. No runtime behavior changed.
 
 ### B1: Transactional booking application use case
 
+The maintainer approved the [complete B1 plan](b1-booking-implementation-plan.md)
+on 2026-09-16. Scope includes the booking portion of H1 and Swagger UI, with no
+automatic booking retries, idempotency keys, or new schema.
+
 Completion criteria:
 
 - Application coordinates fresh room/service reads, period and availability
@@ -187,6 +191,22 @@ Completion criteria:
   concurrent overlaps while allowing adjacent bookings.
 - Integration tests use independent database connections to verify concurrent
   requests, conflict handling, rollback, and complete snapshot persistence.
+- POST /bookings exposes the agreed request, price breakdown, and safe error
+  contracts, with HTTP tests, OpenAPI, and development Swagger UI.
+
+Verified on 2026-09-16: the complete booking path persists the expected 9400 UAH
+example and snapshots. Independent-connection tests cover overlaps, adjacency,
+current room/service data after locking, rollback, cancellation, and safe errors.
+All 167 tests passed on Windows (90 Domain, 17 Application, 48 Integration,
+12 AppHost), without skips. Restore, Release build with zero warnings/errors,
+EF model check, OpenAPI/Swagger HTTP checks, documentation links/solution items,
+and diff checks passed. Application.Tests is now part of CI. See the
+[command and evidence record](b1-booking-implementation-plan.md#9-implementation-and-validation-record).
+
+The implementation remains unmerged on `feature/booking-creation`; no push or PR
+has been made. Hosted Linux Actions results await publication. R1, A1, reports,
+and the remaining H1 operations are outside this delivery. After merge, confirm
+the merge and relevant validation before changing B1 to Done.
 
 ### R1: Room management and lifecycle restrictions
 
@@ -196,6 +216,8 @@ Completion criteria:
 - Active room-name uniqueness is enforced in persistence.
 - Capacity reduction and deletion are rejected when ongoing or future bookings
   exist, using the shared transaction and locking protocol.
+- Room and service mutations acquire the same room-row lock as B1 before
+  reading current state, as described in the [booking rules](booking-and-pricing-rules.md#booking-transaction-and-room-changes).
 - Service editing, including renaming behavior, is explicitly agreed and
   preserves existing booking snapshots.
 - Tests verify lifecycle rules and races with booking creation.
@@ -207,9 +229,15 @@ Completion criteria:
 - Search applies active-room, capacity, overlap, and full tariff-coverage rules.
 - Search and booking use the same domain period and tariff interpretation.
 - Queries avoid loading full booking histories or issuing a query per room.
+- Results include current service IDs, names, and prices so clients can select
+  services when creating a booking.
 - Tests cover adjacent intervals, unavailable rooms, and tariff gaps.
 
 ### H1: Complete the five business API operations
+
+The booking operation, its HTTP contract/tests, and development Swagger UI are
+delivered with B1. Room creation, editing, deletion, and availability search
+remain planned under R1 and A1.
 
 Completion criteria:
 

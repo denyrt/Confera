@@ -69,21 +69,22 @@ public sealed class BookingPriceCalculatorTests
     {
         var end = endHour == 24 ? At(0).AddDays(1) : At(endHour);
 
-        Assert.Throws<ArgumentException>(() =>
+        Assert.Throws<BookingValidationException>(() =>
             BookingPriceCalculator.Calculate(At(startHour), end, 1000m, InitialRules()));
     }
 
     [Fact]
     public void Calculate_RejectsGapInMiddle()
     {
-        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(15), 1000m,
+        Assert.Throws<BookingValidationException>(() => BookingPriceCalculator.Calculate(At(9), At(15), 1000m,
             [Rule("first", 9, 11), Rule("second", 12, 15)]));
     }
 
     [Fact]
     public void Calculate_RejectsEmptyRules()
     {
-        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(9), At(10), 1000m, []));
+        var error = Assert.Throws<BookingValidationException>(() => BookingPriceCalculator.Calculate(At(9), At(10), 1000m, []));
+        Assert.Equal(BookingValidationError.MissingTariffCoverage, error.Error);
     }
 
     [Fact]

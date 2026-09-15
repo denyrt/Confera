@@ -52,9 +52,41 @@ have no overlapping booking, and have valid tariff coverage for the full
 requested interval. The same period limits apply to search and booking.
 
 Availability must be checked again when creating a booking. Search does not
-reserve a room. Application use cases coordinate these checks, and persistence
-must prevent overlapping bookings even when requests arrive concurrently.
+reserve a room. B1 coordinates these checks in Application, and persistence
+prevents overlapping bookings even when requests arrive concurrently.
 Adjacent bookings are allowed under the `[start, end)` interval convention.
+
+### Booking transaction and room changes
+
+B1 opens a fresh context and a short Read Committed transaction, acquires
+`SELECT ... FOR UPDATE` on the room ID, then reads the room and its services
+in a separate statement. An absent/deleted room is unavailable for booking.
+After reading the complete tariff set in one query, it obtains one UTC clock
+value, floors it to microseconds, and uses it for validation and CreatedAtUtc.
+A requested start that passed while waiting for the lock is rejected. Availability
+uses `existing.Start < requested.End && existing.End > requested.Start`.
+
+The complete booking is saved and committed before returning success. The
+existing exclusion constraint is the final overlap guard, and its specific
+violation maps to the same conflict as the preliminary availability check.
+The room lock briefly serializes same-room writes, including disjoint periods.
+
+R1 must acquire this same room lock before reading, validating, or changing a
+room, its service collection, or its deleted state. The lock protocol applies
+to supported application operations; arbitrary SQL child edits do not
+automatically obey it. B1 does not implement R1's lifecycle operations.
+
+The tariff set used for pricing is the set read during this transaction;
+there is no extra guarantee of the latest tariff at commit time and no global
+tariff lock. New requests read fresh configuration; confirmed snapshots remain
+independent. API booking writes have no automatic retries or idempotency keys.
+A connection loss during commit can leave the result unknown; repeating the
+same request after a successful commit can return a conflict. No public
+booking-retrieval endpoint is added to compensate for this accepted limitation.
+
+Request cancellation flows to database commands. Configured command timeouts
+bound waits; expected temporary persistence failures return a safe unavailable
+response. A failed response never promises that no booking was persisted.
 
 ## Segments and rule selection
 

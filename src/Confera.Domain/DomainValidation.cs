@@ -38,20 +38,6 @@ internal static class DomainValidation
         return value;
     }
 
-    public static void RequireBookingPeriod(
-        DateTime startsAtUtc,
-        DateTime endsAtUtc,
-        DateTime nowUtc)
-    {
-        RequireRentalPeriod(startsAtUtc, endsAtUtc);
-        RequireUtc(nowUtc, nameof(nowUtc));
-
-        if (startsAtUtc < nowUtc)
-        {
-            throw new ArgumentException("Booking cannot start in the past.", nameof(startsAtUtc));
-        }
-    }
-
     public static DateTime RequireUtc(DateTime value, string parameterName)
     {
         if (value.Kind != DateTimeKind.Utc || value.Ticks % 10 != 0)
@@ -110,18 +96,6 @@ internal static class DomainValidation
         if (endsAtUtc <= startsAtUtc)
         {
             throw new ArgumentException("Interval must end after it starts.", nameof(endsAtUtc));
-        }
-    }
-
-    public static void RequireRentalPeriod(DateTime startsAtUtc, DateTime endsAtUtc)
-    {
-        RequireUtcInterval(startsAtUtc, endsAtUtc);
-
-        var duration = endsAtUtc - startsAtUtc;
-
-        if (duration < TimeSpan.FromMinutes(30) || duration > TimeSpan.FromHours(24))
-        {
-            throw new ArgumentOutOfRangeException(nameof(endsAtUtc), "Booking duration must be between 30 minutes and 24 hours.");
         }
     }
 }

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
     <RuntimeHostConfigurationOption Include="Npgsql.DisableDateTimeInfinityConversions" Value="true" />
   </ItemGroup>
 
@@ -19,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\orchestration\Confera.ServiceDefaults\Confera.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Confera.Application\Confera.Application.csproj" />
+    <ProjectReference Include="..\Confera.Domain\Confera.Domain.csproj" />
     <ProjectReference Include="..\Confera.Infrastructure\Confera.Infrastructure.csproj" />
   </ItemGroup>
 

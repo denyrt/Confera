@@ -85,12 +85,11 @@ public sealed class Room
         IReadOnlyList<BookingPricingRule> rules)
     {
         nowUtc = UtcPrecision.Floor(nowUtc);
-        DomainValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
-        ArgumentNullException.ThrowIfNull(serviceIds, nameof(serviceIds));
+        BookingValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
+        BookingValidation.RequireServiceIds(serviceIds);
         ArgumentNullException.ThrowIfNull(rules, nameof(rules));
 
-        EnsureUniqueIds(serviceIds, nameof(serviceIds));
-        EnsureServiceIdsExists(serviceIds, nameof(serviceIds));
+        EnsureServiceIdsExist(serviceIds);
 
         var selectedIds = serviceIds.ToHashSet();
         var selectedServices = _services
@@ -103,13 +102,14 @@ public sealed class Room
         return new Booking(Id, startsAtUtc, endsAtUtc, nowUtc, HourlyRate, selectedServices, segments);
     }
 
-    private void EnsureServiceIdsExists(IEnumerable<Guid> serviceIds, string parameterName)
+    private void EnsureServiceIdsExist(IEnumerable<Guid> serviceIds)
     {
         var supportedIds = _services.Select(x => x.Id).ToHashSet();
 
         if (serviceIds.Any(id => !supportedIds.Contains(id)))
         {
-            throw new ArgumentException("Selected services are not available in this room.", parameterName);
+            throw new BookingValidationException(BookingValidationError.InvalidServiceSelection,
+                "Selected services are not available in this room.");
         }
     }
 
@@ -120,14 +120,6 @@ public sealed class Room
             .Any(group => group.Count() > 1))
         {
             throw new ArgumentException("Service names must be unique within a room.", parameterName);
-        }
-    }
-
-    private static void EnsureUniqueIds(IReadOnlyList<Guid> serviceIds, string parameterName)
-    {
-        if (serviceIds.ToHashSet().Count != serviceIds.Count)
-        {
-            throw new ArgumentException("Duplicate ids cannot be used.", parameterName);
         }
     }
 }
