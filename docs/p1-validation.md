@@ -2,8 +2,10 @@
 
 Implementation branch: `feature/postgres-persistence`, based on fetched
 `origin/main` commit `b0ec043`, which contains the approved specification
-(documentation PR #6). The initial working tree was clean. Implementation is
-local and unmerged; no PR or merge is part of this delivery.
+(documentation PR #6). The initial working tree was clean. The initial handoff
+was local and unmerged. On 2026-09-15, commit `8875883` was confirmed on fetched
+`origin/main` after a direct push without a PR; the maintainer requested the
+Done status. See the delivery update below for the publication evidence.
 
 ## Environment and command results
 
@@ -93,7 +95,7 @@ to executable checks and the manual local-isolation evidence below.
 | Seed | All five `SeedTests` cover four simultaneous initializers with a barrier, one completion marker, exact demo rows and Room A total 9400, edits/deletion/emptied marked database, non-empty unmarked skip, rollback, fresh-context transient replay, and lost-commit-acknowledgement marker recheck. `SeedDisabledWorkerAppliesSchemaOnlyAndStopsSuccessfully` covers explicit opt-out. |
 | Orchestration | `FreshStartupMigratesAndSeedsBeforeHealthyApiWithoutRestart` records worker exit 0 before API Running/healthy. Failure-gating test executes an actual invalid-schema worker and observes nonzero exit/API FailedToStart. The recreation test verifies two different containers, actual mount, server version/PGDATA and retained edited data. Seven worker cases cover recovery, six-retry bound/delay, non-retried permanent SQLSTATEs, shutdown and actual deadline cancellation. |
 | Isolation | `ParallelDatabasesAreCleanAndDisposalDropsOnlyOwnedDatabase`, concurrent AppHosts, fresh random databases/ports, empty mount annotations, and test-owned volume cleanup are checked. The manual local run below confirms unchanged local rows/volume while suites execute. Successful suite disposal left no test containers or test-owned named volumes. |
-| CI and docs | The Linux workflow restores/builds, creates the development certificate, runs all implemented suites, and always archives TRX/safe diagnostics. Local Windows/Linux commands, EF commands, two local startup profiles, document/solution paths and diff whitespace are verified. Hosted GitHub Actions execution awaits publication; no remote run is claimed. |
+| CI and docs | The Linux workflow restores/builds, creates the development certificate, runs all implemented suites, and always archives TRX/safe diagnostics. Local Windows/Linux commands, EF commands, two local startup profiles, document/solution paths and diff whitespace are verified. Hosted GitHub Actions results have not been verified in this record; no remote pass is claimed. |
 
 SQL CHECK/FK constraints enforce the documented per-row rules. Complete segment
 coverage, total equality and selected-service ownership remain Domain invariants
@@ -187,10 +189,10 @@ were formatted with `dotnet format whitespace Confera.slnx --no-restore --includ
 and the changed/new C# path list. The local validator is retained at
 `artifacts/validate-docs.ps1`.
 
-P1 is **Verified** against the entire acceptance matrix. Implementation remains
-local and unmerged, with no PR created. Done requires a separately confirmed
-merge. Hosted GitHub Actions has not been run because these changes have not
-been published; its build/test sequence passed in the local Linux rehearsal.
+At the initial handoff, P1 was **Verified** against the entire acceptance matrix
+and remained local and unmerged, with no PR created. The hosted GitHub Actions
+run was not part of that validation; its build/test sequence passed in the local
+Linux rehearsal. The subsequent delivery/status update is recorded below.
 The completed Linux validation container and its helper image were removed;
 the development volume and unrelated pre-existing volumes were preserved.
 
@@ -214,3 +216,39 @@ dotnet test --project tests/Confera.Integration.Tests --configuration Release --
 ```
 
 Changed C# files were formatted and `git diff --check` passed.
+
+## Delivery and workflow follow-up
+
+On 2026-09-15, these Git checks confirmed the published implementation and the
+incorrect task-branch tracking:
+
+```powershell
+git fetch origin
+git log -1 origin/main --format='%H %s'
+git branch -vv
+git config --get branch.feature/postgres-persistence.merge
+```
+
+The fetched `origin/main` resolves to
+`8875883c69162bbf9c9ac7c304e2a3591dc05a8f`
+(`feat(persistence): implement P1 PostgreSQL foundation`). The local
+`feature/postgres-persistence` branch points at that commit and its upstream
+configuration is `refs/heads/main`, not a matching feature branch. The maintainer
+confirmed publication without a PR and requested P1 be recorded as **Done**.
+This is an explicitly recorded direct-push exception, not evidence of a PR merge.
+
+The status/workflow correction is on `docs/p1-completion-workflow`, created with
+`git switch -c docs/p1-completion-workflow --no-track origin/main`. It has no
+upstream. CONTRIBUTING now documents separate branch-base/upstream choices,
+an explicit first push to the matching task branch, and checks before IDE sync.
+The old feature branch's tracking was inspected, not changed. No new push,
+commit, PR, or merge was performed for this documentation correction.
+
+The earlier Windows/Linux acceptance results and focused NameIdentity checks
+remain the runtime evidence. Hosted Actions results were not verified during
+this update; builds and tests were not rerun for documentation-only changes.
+
+Documentation validation: `git diff --check` passed, and
+`./artifacts/validate-docs.ps1` verified 46 local links/anchors, 33 solution paths,
+and all 12 Markdown registrations. `git diff --name-only` confirmed that only
+CONTRIBUTING and the three P1 status/evidence documents changed.
