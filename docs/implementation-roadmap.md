@@ -25,6 +25,12 @@ Record the actual checks and material limitations. If a completed task regresses
 record the regression and the follow-up task rather than preserving a misleading
 completion claim.
 
+P1 has one maintainer-accepted delivery exception: its verified implementation
+was pushed directly to `main`, without a PR, and the maintainer requested that
+it be recorded as Done after confirming the commit on `origin/main`. Its entry
+records that route explicitly; it is not a PR merge and does not change the
+GitHub Flow requirement for subsequent work.
+
 ## Delivery sequence
 
 The order below is the current implementation direction. Task boundaries may be
@@ -35,7 +41,7 @@ alongside their corresponding application use cases.
 | --- | --- | --- | --- |
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
-| P1 | PostgreSQL persistence and infrastructure foundation | Verified | Local `feature/postgres-persistence`, 2026-09-15: full acceptance matrix passed; Release builds without warnings, 88 Domain + 14 PostgreSQL + 12 AppHost/worker tests passed on both Windows and Linux. [Commands and evidence](p1-validation.md). Not merged. |
+| P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
 | B1 | Transactional booking application use case | Planned | Depends on P1. |
 | R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
@@ -146,13 +152,25 @@ Unicode scalar conformance and local/test coexistence. Each environment passed
 EF found no pending model changes. Application.Tests still reports zero tests
 and MTP exit 8, as required until B1. Local startup/EF commands, documentation
 links, solution paths and diff checks passed. CI's Linux sequence passed locally;
-a hosted Actions run and merge await publication. See the complete
-[P1 validation record](p1-validation.md); this establishes Verified, not Done.
+a hosted Actions run and merge awaited publication at that initial handoff.
+See the complete [P1 validation record](p1-validation.md); those local checks
+established Verified before publication.
 
 Subsequent NameIdentity refinement on the same date adds explicit null guards
 and UTF-16 span appending without per-Rune boxing/string conversion. Windows
 regression checks passed: 90 Domain tests and full PostgreSQL Unicode key
 conformance; details and commands are appended to the P1 validation record.
+
+Completion recorded on 2026-09-15 at the maintainer's request: after
+`git fetch origin`, `origin/main` resolves to
+`8875883c69162bbf9c9ac7c304e2a3591dc05a8f`, containing the P1 implementation and
+NameIdentity follow-up. Delivery was a direct push, with no PR or PR merge.
+The local feature branch had incorrectly tracked `origin/main`; CONTRIBUTING
+now requires `--no-track` when branching from `origin/main`, an explicit first
+push destination, and verification of the matching feature upstream. Hosted
+Actions results were not verified in this status update; the existing local
+Windows/Linux validation remains the recorded test evidence. No application
+code or P1 behavior changed in this documentation update.
 
 Planning validation on 2026-09-15: tools/package restore succeeded; Release
 build passed with no warnings or errors; all 70 existing Domain tests passed;

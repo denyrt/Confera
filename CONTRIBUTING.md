@@ -27,6 +27,47 @@ Use `<type>/<short-kebab-case-description>` with lowercase English names:
 | `perf/` | Performance improvements | `perf/registration-query` |
 | `style/` | Formatting without behavior changes | `style/format-source` |
 
+### Create and publish a task branch
+
+Check `git status --short --branch` and preserve any existing user changes before
+switching branches. Fetch `origin` and verify that `origin/main` contains every
+required prerequisite, including an approved specification. Do not assume that
+a documentation branch or PR has merged. Continue an existing task on its task
+branch; the following example is for a new branch:
+
+```powershell
+git fetch origin
+git log -5 --oneline origin/main
+git switch --no-track -c feature/example-change origin/main
+git branch -vv
+```
+
+Run commands sequentially and stop on failure. `--no-track` is required when
+branching from `origin/main`: Git can otherwise configure the new task branch
+to track `origin/main`. The starting commit and the upstream are different
+choices. A new unpublished task branch must have no upstream; a published one
+must track its own matching remote branch, never `origin/main`.
+
+When publication is explicitly authorized, verify the current branch and use
+an explicit destination for its first push:
+
+```powershell
+git branch --show-current
+git push --set-upstream origin HEAD:refs/heads/feature/example-change
+git branch -vv
+```
+
+Replace `feature/example-change` in both examples with the actual task branch.
+After pushing, verify that its upstream is `origin/feature/example-change`
+before using a bare push or an IDE Publish/Sync action. If an existing task
+branch tracks `origin/main`, remove that incorrect upstream with
+`git branch --unset-upstream <task-branch>` before publishing it to its own
+remote branch. Do not use force push or rewrite `main` to repair tracking.
+
+A push is not a PR or a merge. Open the PR with the task branch as head and
+`main` as base only when explicitly requested; local-work authorization does
+not authorize publication or merging.
+
 ## Commits and pull requests
 
 Use Conventional Commits for commit subjects and PR titles:

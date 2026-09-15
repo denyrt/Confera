@@ -1,7 +1,9 @@
 # P1: PostgreSQL persistence specification
 
-Status: approved specification and implementation plan; implementation Verified,
-local and unmerged, on 2026-09-15.
+Status: implementation Done on 2026-09-15. Verified commit `8875883` is confirmed
+on fetched `origin/main` after a direct push without a PR. The maintainer
+accepted this delivery exception; see the roadmap for its record. The acceptance
+contract and historical approved implementation plan below remain unchanged.
 Prepared and approved for implementation on 2026-09-15. This document is the
 complete acceptance contract for P1. See the [validation record](p1-validation.md)
 and [roadmap](implementation-roadmap.md) for actual implementation evidence.
