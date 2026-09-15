@@ -8,7 +8,7 @@ public static class BookingPriceCalculator
         decimal hourlyRate,
         IReadOnlyList<BookingPricingRule> rules)
     {
-        DomainValidation.RequireRentalPeriod(startsAtUtc, endsAtUtc);
+        BookingValidation.RequireRentalPeriod(startsAtUtc, endsAtUtc);
         DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
         BookingPricingRule.ValidateSet(rules);
 
@@ -20,7 +20,7 @@ public static class BookingPriceCalculator
         {
             var segmentStartTicks = boundaries[i];
             var segmentEndTicks = boundaries[i + 1];
-            var rule = RequireCoveringRule(intervals, segmentStartTicks, segmentEndTicks, nameof(rules));
+            var rule = RequireCoveringRule(intervals, segmentStartTicks, segmentEndTicks);
 
             segments.Add(new BookingRentalSegment(
                 new DateTime(segmentStartTicks, DateTimeKind.Utc),
@@ -52,8 +52,7 @@ public static class BookingPriceCalculator
     private static BookingPricingRule RequireCoveringRule(
         IReadOnlyList<RuleInterval> intervals,
         long segmentStartTicks,
-        long segmentEndTicks,
-        string parameterName)
+        long segmentEndTicks)
     {
         var rule = intervals
             .Where(interval => interval.StartsAtTicks <= segmentStartTicks
@@ -63,7 +62,8 @@ public static class BookingPriceCalculator
 
         if (rule is null)
         {
-            throw new ArgumentException("The entire booking period must be covered by pricing rules.", parameterName);
+            throw new BookingValidationException(BookingValidationError.MissingTariffCoverage,
+                "The entire booking period must be covered by pricing rules.");
         }
 
         return rule;

@@ -128,15 +128,15 @@ Run every implemented suite explicitly, as CI does:
 
 ```powershell
 dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build
+dotnet test --project tests/Confera.Application.Tests --configuration Release --no-build
 dotnet test --project tests/Confera.Integration.Tests --configuration Release --no-build
 dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-build
 ```
 
-Application.Tests still contains no tests. The runner reports `Zero tests ran`
-with exit code 8 for that project, so the solution test command currently fails.
-Do not suppress this result or add placeholder tests solely to make it green.
-A successful build or zero discovered tests is not evidence of tested application
-behavior. Add meaningful tests with behavior changes. Integration and AppHost
+All four test projects contain implemented suites, including Application's B1
+booking orchestration tests. Do not suppress empty-suite or failed-test results
+or add placeholder tests solely to make a command green. Add meaningful tests
+with behavior changes. Integration and AppHost
 suites require Docker and use PostgreSQL 18.6 with random ports and disposable
 resources. Normal integration tests migrate a unique empty database per test;
 seed scenarios opt in. Resource Reaper remains enabled.
@@ -216,19 +216,20 @@ point inward; Domain stays independent of EF Core, ASP.NET Core, and hosting.
 | Domain | None |
 | Application | Domain |
 | Infrastructure | Application, Domain |
-| Api | Application, Infrastructure, ServiceDefaults |
+| Api | Application, Domain, Infrastructure, ServiceDefaults |
 | ServiceDefaults | None within this solution |
 | MigrationWorker | Infrastructure, ServiceDefaults |
 | AppHost | Api, MigrationWorker |
 | Domain.Tests | Domain |
 | Application.Tests | Application, Domain |
-| Integration.Tests | Api, Infrastructure, Domain |
+| Integration.Tests | Api, Application, Infrastructure, Domain |
 | AppHost.Tests | AppHost, Infrastructure, MigrationWorker, Domain |
 
 Application owns use cases and the persistence contracts they need.
 Infrastructure owns the EF Core context, explicit mappings, versioned migrations,
-provider configuration and one-time initializer. It implements future Application
-persistence contracts as use cases require them. API references Infrastructure to compose DI;
+provider configuration and one-time initializer. It implements Application's
+booking persistence contract and future contracts as use cases require them.
+API references Infrastructure to compose DI and Domain to translate typed booking errors;
 controllers should call Application use cases rather than access the context.
 AppHost orchestrates executable services and external resources.
 

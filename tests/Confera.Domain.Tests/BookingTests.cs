@@ -58,7 +58,8 @@ public sealed class BookingTests
         var room = CreateRoom();
         var id = room.Services.First().Id;
 
-        Assert.Throws<ArgumentException>(() => room.Book(At(11), At(15), At(10), [id, id], InitialRules()));
+        var error = Assert.Throws<BookingValidationException>(() => room.Book(At(11), At(15), At(10), [id, id], InitialRules()));
+        Assert.Equal(BookingValidationError.InvalidServiceSelection, error.Error);
     }
 
     [Fact]
@@ -67,8 +68,9 @@ public sealed class BookingTests
         var room = CreateRoom();
         var anotherRoomsService = CreateRoom().Services.First().Id;
 
-        Assert.Throws<ArgumentException>(() =>
+        var error = Assert.Throws<BookingValidationException>(() =>
             room.Book(At(11), At(15), At(10), [anotherRoomsService], InitialRules()));
+        Assert.Equal(BookingValidationError.InvalidServiceSelection, error.Error);
     }
 
     [Fact]
@@ -152,14 +154,15 @@ public sealed class BookingTests
             ? TimeSpan.FromMinutes(30).Subtract(TimeSpan.FromTicks(10))
             : TimeSpan.FromHours(24).Add(TimeSpan.FromTicks(10));
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => CreateRoom().Book(At(10), At(10).Add(duration),
+        Assert.Throws<BookingValidationException>(() => CreateRoom().Book(At(10), At(10).Add(duration),
             At(9), [], InitialRules()));
     }
 
     [Fact]
     public void Book_RejectsPastStart()
     {
-        Assert.Throws<ArgumentException>(() => CreateRoom().Book(At(10), At(11), At(10).AddTicks(10), [], InitialRules()));
+        var error = Assert.Throws<BookingValidationException>(() => CreateRoom().Book(At(10), At(11), At(10).AddTicks(10), [], InitialRules()));
+        Assert.Equal(BookingValidationError.InvalidPeriod, error.Error);
     }
 
     [Theory]
@@ -189,7 +192,14 @@ public sealed class BookingTests
             now = DateTime.SpecifyKind(now, kind);
         }
 
-        Assert.Throws<ArgumentException>(() => CreateRoom().Book(start, end, now, [], InitialRules()));
+        if (changedTime == 2)
+        {
+            Assert.Throws<ArgumentException>(() => CreateRoom().Book(start, end, now, [], InitialRules()));
+        }
+        else
+        {
+            Assert.Throws<BookingValidationException>(() => CreateRoom().Book(start, end, now, [], InitialRules()));
+        }
     }
 
     [Fact]
@@ -197,7 +207,7 @@ public sealed class BookingTests
     {
         var room = CreateRoom();
 
-        Assert.Throws<ArgumentNullException>(() => room.Book(At(10), At(11), At(9), null!, InitialRules()));
+        Assert.Throws<BookingValidationException>(() => room.Book(At(10), At(11), At(9), null!, InitialRules()));
         Assert.Throws<ArgumentNullException>(() => room.Book(At(10), At(11), At(9), [], null!));
     }
 

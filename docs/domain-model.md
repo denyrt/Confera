@@ -5,7 +5,7 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
-This section describes D1 plus the P1 persistence and validation implementation.
+This section describes D1, P1 persistence, and the B1 booking use case/API.
 
 | Model | Responsibility |
 | --- | --- |
@@ -57,11 +57,19 @@ Snapshots keep confirmed booking prices independent of later changes to room
 rates, services, or pricing rules. Domain and real PostgreSQL round-trip tests
 verify this behavior. Reporting over snapshots remains Q1.
 
-Application use cases will coordinate availability checks and persistence.
+CreateBookingService coordinates booking validation, availability, and persistence.
 Infrastructure enforces a PostgreSQL exclusion constraint on room ID and the
-half-open booking interval, including writes on independent connections. B1/R1
-will add the agreed short transaction locking the room row for booking and
-room-change operations. P1 does not implement those application use cases.
+half-open booking interval, including writes on independent connections. B1
+uses a fresh context and Read Committed transaction, locks the room row, then
+reads the current room/services and the full tariff set. The clock is read after
+lock acquisition and used consistently for validation and creation time. R1
+must acquire the same lock before room/service changes and lifecycle checks.
+
+POST /bookings exposes this use case with explicit-offset timestamp validation,
+stable ProblemDetails error codes, price breakdowns, and development Swagger UI.
+BookingValidation is shared Domain period/selection validation; expected
+BookingValidationException errors are distinct from configuration/invariant
+failures. There is no automatic write replay or persisted idempotency key.
 
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.
@@ -98,6 +106,12 @@ availability; and create a booking with its calculated price. Add two read-only
 report endpoints as described below. The booking request uses start and end
 timestamps rather than the assignment's start and duration; both describe the
 same interval.
+
+The booking operation is implemented under B1. Its
+[approved plan](b1-booking-implementation-plan.md#5-http-contract) records the
+request, response, and error codes. Availability search under A1 must include
+the room's current service IDs, names, and prices so clients can select
+room-specific services for a subsequent booking.
 
 Separate public endpoints for price quotes, booking retrieval, cancellation,
 rescheduling, and pricing-rule management are outside this scope. Application

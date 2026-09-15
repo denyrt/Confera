@@ -80,8 +80,8 @@ public sealed class PersistenceContractTests
     public void FineTimeInputIsRejectedBeforeCalculationAndClockIsFloored()
     {
         var room = new Room("Room", 1, 1000m);
-        Assert.Throws<ArgumentException>(() => room.Book(At(10).AddTicks(1), At(11), At(9), [], InitialRules()));
-        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(At(10), At(11).AddTicks(1), 1000m, InitialRules()));
+        Assert.Throws<BookingValidationException>(() => room.Book(At(10).AddTicks(1), At(11), At(9), [], InitialRules()));
+        Assert.Throws<BookingValidationException>(() => BookingPriceCalculator.Calculate(At(10), At(11).AddTicks(1), 1000m, InitialRules()));
         Assert.Throws<ArgumentException>(() => new BookingPricingRule("Fine", "Fine", new TimeOnly(10, 0).Add(TimeSpan.FromTicks(1)), new TimeOnly(11, 0), 1m, 0));
         var booking = room.Book(At(10), At(11), At(10).AddTicks(9), [], InitialRules());
         Assert.Equal(At(10), booking.CreatedAtUtc);

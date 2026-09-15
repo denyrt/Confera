@@ -1,6 +1,25 @@
-@Confera.Api_HostAddress = http://localhost:5089
+@Confera.Api_HostAddress = https://localhost:7205
+@roomId = 00000000-0000-0000-0000-000000000000
+@projectorId = 00000000-0000-0000-0000-000000000000
+@wifiId = 00000000-0000-0000-0000-000000000000
 
-GET {{Confera.Api_HostAddress}}/weatherforecast/
+# Set the host from the Aspire API resource. Replace IDs using the read-only
+# query in docs/local-development.md#try-a-booking and choose an available future date.
+# Zero IDs below are placeholders and intentionally rejected by the API.
+# With the original Room A values, this returns 201 and a total of 9400 UAH.
+# Use "serviceIds": [] for rental only (8600 UAH).
+POST {{Confera.Api_HostAddress}}/bookings
+Content-Type: application/json
 Accept: application/json
 
+{
+  "roomId": "{{roomId}}",
+  "start": "2030-01-15T11:00:00Z",
+  "end": "2030-01-15T15:00:00Z",
+  "serviceIds": ["{{projectorId}}", "{{wifiId}}"]
+}
+
 ###
+
+GET {{Confera.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
