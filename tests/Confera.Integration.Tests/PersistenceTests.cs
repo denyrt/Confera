@@ -46,7 +46,7 @@ public sealed class PersistenceTests(PostgresFixture postgres)
         await using var db = database.Context();
         await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
         Assert.False(db.Database.HasPendingModelChanges());
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken));
         Assert.Empty(await db.Database.GetPendingMigrationsAsync(TestContext.Current.CancellationToken));
         Assert.Empty(await db.Rooms.ToListAsync(TestContext.Current.CancellationToken));
         Assert.Equal("btree_gist", await database.ScalarAsync<string>("SELECT extname FROM pg_extension WHERE extname='btree_gist'"));

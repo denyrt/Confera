@@ -43,9 +43,9 @@ alongside their corresponding application use cases.
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
 | B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
-| R1 | Room management and lifecycle restrictions | Planned | Depends on P1; shares the room-locking protocol with B1. |
+| R1 | Room management and lifecycle restrictions | Verified | Local, unmerged implementation: room API, full replacement, lifecycle guards and ETag/If-Match, including GET /rooms/{id}. Release build and all 225 tests passed on Windows, 2026-09-16; [plan and evidence](r1-room-management-plan.md#validation-record). |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
-| H1 | Complete the five business API operations | In progress | POST /bookings is included in B1; the remaining four operations follow R1 and A1. |
+| H1 | Complete the five business API operations | In progress | Four core operations verified through B1 and R1, plus the supporting room GET; availability search remains A1. |
 | Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
 
 ### D1: Domain booking creation and tariff pricing
@@ -215,6 +215,13 @@ R1, A1, reports, and the remaining H1 operations are outside this delivery.
 
 ### R1: Room management and lifecycle restrictions
 
+The maintainer approved the [R1 execution plan](r1-room-management-plan.md) on
+2026-09-16. Scope includes its three H1 operations and a supporting GET /rooms/{id}
+for conditional editing. Services match by normalized names; spelling updates
+retain IDs, renamed offerings receive new IDs. PUT is a complete replacement.
+An explicit UUID version protects PUT and active-room deletion through If-Match;
+missing/stale conditions return 428/412. Repeated deletion remains 204.
+
 Completion criteria:
 
 - Create, edit, and soft-delete operations follow the agreed room policies.
@@ -226,6 +233,21 @@ Completion criteria:
 - Service editing, including renaming behavior, is explicitly agreed and
   preserves existing booking snapshots.
 - Tests verify lifecycle rules and races with booking creation.
+- GET returns coherent current state and ETag; stale writes are rejected,
+  service-only changes rotate the version, and no-op edits/bookings retain it.
+- A version migration preserves existing data; all room HTTP contracts are
+  documented and tested, including conditional requests and safe failures.
+
+Verified on 2026-09-16: room and service changes follow the agreed identity,
+snapshot and lifecycle rules; concurrent stale writes are rejected. Real B1/R1
+races in both orders verify the shared locking protocol. Migration upgrade,
+rollback, cancellation, safe errors and HTTP/OpenAPI contracts passed. All 225
+tests passed on Windows (101 Domain, 27 Application, 85 Integration, 12 AppHost),
+without skips. Restore, Release build with zero warnings/errors, EF model check,
+71 local documentation links/anchors, 35 solution paths, document registration
+and diff checks passed. See the [validation record](r1-room-management-plan.md#validation-record).
+Implementation is local on feature/room-management and unmerged; no hosted Linux
+CI run or publication is claimed. A1 and reports remain separate tasks.
 
 ### A1: Availability search
 
@@ -241,8 +263,10 @@ Completion criteria:
 ### H1: Complete the five business API operations
 
 The booking operation, its HTTP contract/tests, and development Swagger UI are
-delivered with B1. Room creation, editing, deletion, and availability search
-remain planned under R1 and A1.
+delivered with B1. R1's room creation, editing and deletion are locally verified,
+together with its approved supporting read. Four of the five core operations
+are verified; availability search remains A1. H1 will remain open until all five
+core operations are verified and the complete scope is merged.
 
 Completion criteria:
 

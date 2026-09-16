@@ -1,5 +1,6 @@
 using Confera.Api.Errors;
 using Confera.Application.Bookings;
+using Confera.Application.Rooms;
 using Confera.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,7 @@ builder.Services.AddConferaDatabaseHealth();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CreateBookingService>();
+builder.Services.AddScoped<RoomManagementService>();
 builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
     options.InvalidModelStateResponseFactory = ApiProblems.InvalidRequest);
 builder.Services.AddProblemDetails();

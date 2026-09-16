@@ -20,8 +20,11 @@ public sealed class RoomService
         Price = DomainValidation.RequireServicePrice(price, nameof(price));
     }
 
-    internal void UpdatePrice(decimal price)
+    internal void Update(string name, decimal price)
     {
-        Price = DomainValidation.RequireServicePrice(price, nameof(price));
+        var validatedName = DomainValidation.RequireText(name, 64, nameof(name));
+        var validatedPrice = DomainValidation.RequireServicePrice(price, nameof(price));
+        Name = validatedName;
+        Price = validatedPrice;
     }
 }

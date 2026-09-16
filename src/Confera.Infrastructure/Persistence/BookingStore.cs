@@ -29,18 +29,7 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
     private sealed class BookingTransaction(ConferaDbContext db, IDbContextTransaction transaction) : IBookingTransaction
     {
         public Task<Room?> GetRoomForUpdateAsync(Guid roomId, CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(async () =>
-            {
-                // A separate statement ensures services are read from a snapshot taken AFTER
-                // waiting for the room lock. R1 must acquire this lock before changing services.
-                var lockedIds = await db.Database.SqlQuery<Guid>(
-                    $"""SELECT "Id" AS "Value" FROM "Rooms" WHERE "Id" = {roomId} FOR UPDATE""")
-                    .ToListAsync(cancellationToken);
-
-                return lockedIds.Count == 0
-                    ? null
-                    : await db.Rooms.Include(x => x.Services).SingleAsync(x => x.Id == roomId, cancellationToken);
-            }, cancellationToken);
+            TranslateErrorsAsync(() => RoomQueries.LockAndLoadAsync(db, roomId, cancellationToken), cancellationToken);
 
         public Task<IReadOnlyList<BookingPricingRule>> GetPricingRulesAsync(CancellationToken cancellationToken) =>
             TranslateErrorsAsync<IReadOnlyList<BookingPricingRule>>(async () =>
@@ -96,13 +85,7 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
 
     private static bool TryGetFailure(Exception error, out BookingFailure failure)
     {
-        var cause = error;
-        // Npgsql's non-retrying execution strategy wraps transient query errors in
-        // InvalidOperationException; SaveChanges may also add a DbUpdateException.
-        while (cause is DbUpdateException or InvalidOperationException && cause.InnerException is { } inner)
-        {
-            cause = inner;
-        }
+        var cause = PersistenceErrors.Unwrap(error);
 
         failure = BookingFailure.PersistenceUnavailable;
 
@@ -116,8 +99,6 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
             return true;
         }
 
-        return cause is NpgsqlException { IsTransient: true }
-            or PostgresException { SqlState: PostgresErrorCodes.LockNotAvailable or PostgresErrorCodes.QueryCanceled }
-            or TimeoutException;
+        return PersistenceErrors.IsUnavailable(cause);
     }
 }

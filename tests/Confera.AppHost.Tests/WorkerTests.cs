@@ -28,7 +28,7 @@ public sealed class WorkerTests(PostgresFixture postgres)
         Assert.Equal(2, fault.Failures);
         Assert.True(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping.IsCancellationRequested);
         await using var db = database.Context();
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken));
         Assert.Empty(await db.Rooms.ToListAsync(TestContext.Current.CancellationToken));
     }
 

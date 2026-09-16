@@ -2,6 +2,7 @@
 @roomId = 00000000-0000-0000-0000-000000000000
 @projectorId = 00000000-0000-0000-0000-000000000000
 @wifiId = 00000000-0000-0000-0000-000000000000
+@roomEtag = "replace-with-etag-from-get"
 
 # Set the host from the Aspire API resource. Replace IDs using the read-only
 # query in docs/local-development.md#try-a-booking and choose an available future date.
@@ -23,3 +24,45 @@ Accept: application/json
 
 GET {{Confera.Api_HostAddress}}/openapi/v1.json
 Accept: application/json
+
+### Create a room. Copy its id (or Location) into roomId above.
+
+POST {{Confera.Api_HostAddress}}/rooms
+Content-Type: application/json
+
+{
+  "name": "Demo meeting room",
+  "capacity": 50,
+  "hourlyRate": 2000,
+  "services": [
+    { "name": "Projector", "price": 500 },
+    { "name": "Wi-Fi", "price": 300 }
+  ]
+}
+
+### Read current data and copy the ETag header, including quotes, into roomEtag.
+
+GET {{Confera.Api_HostAddress}}/rooms/{{roomId}}
+Accept: application/json
+
+### Replace all editable fields. GET again afterward to obtain the new ETag.
+# Reusing an old tag after a real change returns 412; omitting it returns 428.
+
+PUT {{Confera.Api_HostAddress}}/rooms/{{roomId}}
+Content-Type: application/json
+If-Match: {{roomEtag}}
+
+{
+  "name": "Demo meeting room",
+  "capacity": 50,
+  "hourlyRate": 2500,
+  "services": [
+    { "name": "Projector", "price": 500 },
+    { "name": "Sound", "price": 700 }
+  ]
+}
+
+### Soft delete. Requires no ongoing/future bookings. Repeats return 204.
+
+DELETE {{Confera.Api_HostAddress}}/rooms/{{roomId}}
+If-Match: {{roomEtag}}

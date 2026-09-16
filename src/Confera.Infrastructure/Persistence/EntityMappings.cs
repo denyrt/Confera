@@ -51,6 +51,8 @@ internal sealed class RoomMapping : IEntityTypeConfiguration<Room>
         b.ToTable("Rooms", t => t.HasCheckConstraint("CK_Rooms_Capacity", "\"Capacity\" > 0"));
         ColumnRules.Number(b, "Rooms", nameof(Room.HourlyRate), "1000", "100000");
         b.Property(x => x.IsDeleted).HasDefaultValue(false).IsRequired();
+        b.Property(x => x.Version).HasDefaultValueSql("gen_random_uuid()").ValueGeneratedNever().IsConcurrencyToken();
+        b.ToTable("Rooms", t => t.HasCheckConstraint("CK_Rooms_Version", "\"Version\" <> '00000000-0000-0000-0000-000000000000'::uuid"));
         b.HasIndex("NameKey").IsUnique().HasDatabaseName("UX_Rooms_ActiveName").HasFilter("\"IsDeleted\" = false");
         b.HasMany(x => x.Services).WithOne().HasForeignKey(x => x.RoomId)
             .OnDelete(DeleteBehavior.Cascade).HasConstraintName("FK_RoomServices_Rooms");

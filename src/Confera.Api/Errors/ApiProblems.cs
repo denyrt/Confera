@@ -17,7 +17,7 @@ internal static class ApiProblems
     internal static IActionResult InvalidRequest(ActionContext context)
     {
         var problem = Create(context.HttpContext, StatusCodes.Status400BadRequest, "invalid_request",
-            "Supply all required fields, valid identifiers, and timestamps with an explicit offset and whole-microsecond precision.");
+            "Supply all required fields with valid values and formats as described by the endpoint contract.");
         var response = new BadRequestObjectResult(problem);
         response.ContentTypes.Add("application/problem+json");
         return response;

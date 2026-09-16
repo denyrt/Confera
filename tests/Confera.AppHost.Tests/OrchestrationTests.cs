@@ -34,7 +34,7 @@ public sealed class OrchestrationTests
         Assert.Equal(3, await db.Rooms.CountAsync(timeout.Token));
         Assert.Equal(4, await db.PricingRules.CountAsync(timeout.Token));
         Assert.Single(await db.InitializationMarkers.ToListAsync(timeout.Token));
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync(timeout.Token));
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(timeout.Token));
         await app.ResourceNotifications.WaitForResourceAsync("confera-migrations", e => e.Snapshot.ExitCode == 0, timeout.Token);
         var snapshots = states.ToArray();
         var completed = Array.FindIndex(snapshots, e => e.Resource.Name == "confera-migrations" && e.Snapshot.ExitCode == 0);
@@ -168,7 +168,7 @@ public sealed class OrchestrationTests
         Assert.Empty(await db.Rooms.ToListAsync(timeout.Token));
         Assert.Empty(await db.PricingRules.ToListAsync(timeout.Token));
         Assert.Empty(await db.InitializationMarkers.ToListAsync(timeout.Token));
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync(timeout.Token));
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(timeout.Token));
     }
 
     private static CancellationTokenSource Deadline()

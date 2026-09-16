@@ -17,7 +17,7 @@ dotnet run --project orchestration/Confera.AppHost --configuration Release --no-
 
 Open the dashboard URL printed by AppHost and use its API resource endpoint.
 The development API exposes `/health`, `/alive`, `/openapi/v1.json`, and Swagger
-UI at `/swagger`. `POST /bookings` is the first business endpoint. Stop AppHost
+UI at `/swagger`, with booking and room-management endpoints. Stop AppHost
 with Ctrl+C.
 
 The default launch profile uses HTTPS and the local ASP.NET development
@@ -134,7 +134,36 @@ Booking writes do not automatically retry and do not support idempotency keys.
 A failed/lost response may follow a successful commit. Repeating a successful
 booking request returns 409, not the previous confirmation. Use a different
 available period for another demo booking. The API has no authentication or
-public retrieval/cancellation operations in the agreed assignment scope.
+public booking retrieval/cancellation operations in the agreed assignment scope.
+
+## Manage rooms with ETag
+
+Use Swagger or the [HTTP request file](../src/Confera.Api/Confera.Api.http).
+POST /rooms accepts name, capacity, hourlyRate and services (each has name/price).
+It returns 201, room/service IDs and Location pointing to GET /rooms/{id}.
+For seeded rooms, the SQL lookup above supplies the initial room ID; subsequent
+GETs supply all current details and service IDs.
+
+1. GET /rooms/{id}; copy its ETag response header, including quotes.
+2. PUT /rooms/{id} with If-Match and every editable field. Include the complete
+   desired service array. Matching normalized names retain IDs, updated spelling
+   and prices; renamed services get new IDs. `services: []` removes all.
+3. PUT returns current data. GET again for the next ETag; the PUT response has
+   no ETag because normalization and generated service IDs transform the input.
+4. DELETE /rooms/{id} uses If-Match too. Capacity reduction and deletion return
+   409 while any booking ends after now. Repeated deletion returns 204 even with
+   the old or missing header; GET and PUT then return 404.
+
+To demonstrate stale-write protection, read the same room twice, update it using
+the first ETag, then try another change with the old ETag: expect 412. Missing
+If-Match returns 428. Read again and review the newer data before submitting;
+do not automatically retry with a refreshed tag. A no-op replacement preserves
+the ETag. Booking creation also preserves it. Explicit strong-tag lists are
+accepted; weak tags never match and wildcard * is rejected.
+
+GET responses use Cache-Control: no-store. No room restoration or automatic
+write replay is implemented. A lost response can follow a committed change.
+The [R1 contract](r1-room-management-plan.md) lists the stable ProblemDetails codes.
 
 ## Worker and demo initialization
 
@@ -170,7 +199,7 @@ credentials. Successful initialization stops the worker.
 
 ## Migrations without AppHost
 
-Infrastructure owns the context, design-time factory, initial migration, and
+Infrastructure owns the context, design-time factory, versioned migrations, and
 model snapshot. Configure `ConnectionStrings__confera` outside tracked files
 for commands that connect to a database:
 
@@ -194,6 +223,9 @@ Review custom SQL and generated files together. The initial migration creates
 foreign keys, indexes, and the booking exclusion constraint. Tests exercise
 `MigrateAsync`, never `EnsureCreated`. Do not replace or rewrite an already
 deployed migration when later work introduces schema changes.
+
+R1's RoomVersion migration adds a UUID concurrency token with a generated default
+for existing rows; it preserves names, services, bookings and initialization state.
 
 ## Isolated tests and diagnostics
 
@@ -296,3 +328,5 @@ replace Testcontainers' vulnerable 2025.1.0 transitive dependency
 B1 adds Swashbuckle.AspNetCore.SwaggerUI 10.2.3 with the existing OpenAPI
 generator, Microsoft.AspNetCore.Mvc.Testing 10.0.12 for HTTP tests, and the same
 TRX reporter to Application.Tests. It introduces no schema migration.
+
+R1 reuses these dependencies and adds only the RoomVersion schema migration.

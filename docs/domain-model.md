@@ -5,11 +5,11 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
-This section describes D1, P1 persistence, and the B1 booking use case/API.
+This section describes D1, P1 persistence, B1 booking, and R1 room management.
 
 | Model | Responsibility |
 | --- | --- |
-| `Room` | Room identity, name, capacity, hourly rate, current services, and minimal `IsDeleted` state. |
+| `Room` | Room identity, name, capacity, hourly rate, current services, soft deletion, and UUID version for conditional writes. |
 | `RoomService` | A service offered by a specific room, with its own identity and price. |
 | `Booking` | Booking interval and creation time in UTC, room reference, pricing snapshots, and total price. |
 | `BookingPricingRule` | A daily time interval, multiplier, and priority used to determine pricing and bookable hours. |
@@ -19,7 +19,11 @@ This section describes D1, P1 persistence, and the B1 booking use case/API.
 
 Room details can be updated through validated methods. Replacing room services
 validates the complete input before changing the collection, requires unique
-names ignoring case, and preserves existing service IDs when names match.
+normalized names, and preserves existing service IDs when names match. Matching
+services accept updated display spelling and prices; a different normalized
+name replaces the offering with a new ID. RoomDetails captures and validates
+an entire update before mutation. Real field/service changes rotate Version;
+equivalent replacements retain it. Deleted rooms cannot be updated or booked.
 
 Booking-input validation requires UTC timestamps, a duration of 30 minutes to
 24 hours inclusive, and a start that is not before the supplied current time.
@@ -63,7 +67,7 @@ half-open booking interval, including writes on independent connections. B1
 uses a fresh context and Read Committed transaction, locks the room row, then
 reads the current room/services and the full tariff set. The clock is read after
 lock acquisition and used consistently for validation and creation time. R1
-must acquire the same lock before room/service changes and lifecycle checks.
+uses the same lock before room/service changes and lifecycle checks.
 
 POST /bookings exposes this use case with explicit-offset timestamp validation,
 stable ProblemDetails error codes, price breakdowns, and development Swagger UI.
@@ -74,19 +78,20 @@ failures. There is no automatic write replay or persisted idempotency key.
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.
 
-The current models do not yet enforce all these decisions. Remaining work
-includes soft-delete operations and restrictions on capacity reduction and
-deletion when ongoing or future bookings exist. Active-room name uniqueness
-and soft-delete storage are implemented. Service
-renaming is allowed by the agreed policy; the current collection replacement
-matches services by name rather than providing a dedicated rename operation.
+RoomManagementService implements creation, read, full replacement and deletion.
+It uses an existence query under the shared lock to reject capacity reduction
+or deletion if any booking ends after one canonical current UTC instant.
+Version preconditions prevent stale changes; the EF mapping also uses Version
+as a concurrency token. GET reads current room/services/version in one statement.
+History checks belong to Application/Infrastructure, not a Room.Bookings collection.
 
 The [P1 implementation](p1-persistence-specification.md) includes minimal
 `Room.IsDeleted` state, normalized active-room/service name integrity, inclusive
 rate/service/multiplier bounds, microsecond time precision, unique priorities,
 EF mappings/migrations, MigrationWorker and isolated real-database tests.
-Lifecycle operations and booking-dependent room restrictions remain R1.
-Room continues to own services without a `Room.Bookings` navigation.
+R1 adds lifecycle operations, booking-dependent restrictions, and a version
+migration that preserves existing rows. Room continues to own services without
+a `Room.Bookings` navigation.
 
 EF rehydrates aggregates through private constructors and backing collections.
 Service removal does not cascade to historical snapshots; physical deletion of
@@ -103,7 +108,8 @@ by the database and compared with the `C` collation.
 
 Expose the assignment's five operations: create, edit, and delete a room; search
 availability; and create a booking with its calculated price. Add two read-only
-report endpoints as described below. The booking request uses start and end
+report endpoints as described below. R1 also includes GET /rooms/{id}, explicitly
+approved to obtain room state and ETag for conditional editing. The booking request uses start and end
 timestamps rather than the assignment's start and duration; both describe the
 same interval.
 
@@ -112,6 +118,12 @@ The booking operation is implemented under B1. Its
 request, response, and error codes. Availability search under A1 must include
 the room's current service IDs, names, and prices so clients can select
 room-specific services for a subsequent booking.
+
+R1 exposes room creation, full replacement, soft deletion and room-by-ID reading.
+PUT and deletion of an active room require If-Match; stale versions return 412
+and missing conditions 428. Repeated deletion returns 204 even with an old or
+missing version. See the [R1 contract](r1-room-management-plan.md) for complete
+request, precondition, response and failure semantics. Availability remains A1.
 
 Separate public endpoints for price quotes, booking retrieval, cancellation,
 rescheduling, and pricing-rule management are outside this scope. Application

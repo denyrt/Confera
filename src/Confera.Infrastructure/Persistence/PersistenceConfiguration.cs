@@ -1,4 +1,5 @@
 using Confera.Application.Bookings;
+using Confera.Application.Rooms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -37,6 +38,7 @@ public static class PersistenceConfiguration
             ?? throw new InvalidOperationException("ConnectionStrings:confera is required.");
         services.AddDbContextFactory<ConferaDbContext>(options => Configure(options, connection, workerRetries));
         services.AddScoped<IBookingStore, BookingStore>();
+        services.AddScoped<IRoomStore, RoomStore>();
         return services;
     }
 
