@@ -2,35 +2,67 @@ namespace Confera.Domain.Bookings;
 
 public static class BookingPriceCalculator
 {
+    /// <summary>Checks full tariff coverage without calculating a rental price.</summary>
+    /// <remarks>Invalid periods and rule configurations throw; missing coverage returns false.</remarks>
+    public static bool HasFullCoverage(RentalPeriod period, IReadOnlyList<BookingPricingRule> rules)
+    {
+        ArgumentNullException.ThrowIfNull(period);
+        BookingPricingRule.ValidateSet(rules);
+
+        return GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules) is not null;
+    }
+
     public static IReadOnlyList<BookingRentalSegment> Calculate(
-        DateTime startsAtUtc,
-        DateTime endsAtUtc,
+        RentalPeriod period,
         decimal hourlyRate,
         IReadOnlyList<BookingPricingRule> rules)
     {
-        BookingValidation.RequireRentalPeriod(startsAtUtc, endsAtUtc);
+        ArgumentNullException.ThrowIfNull(period, nameof(period));
         DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
         BookingPricingRule.ValidateSet(rules);
 
-        var intervals = ExpandRules(startsAtUtc, endsAtUtc, rules);
-        var boundaries = GetSegmentBoundaries(startsAtUtc, endsAtUtc, intervals);
+        var coveredSegments = GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules)
+            ?? throw new BookingValidationException(BookingValidationError.MissingTariffCoverage,
+                "The entire booking period must be covered by pricing rules.");
         var segments = new List<BookingRentalSegment>();
 
-        for (var i = 0; i < boundaries.Length - 1; i++)
+        foreach (var segment in coveredSegments)
         {
-            var segmentStartTicks = boundaries[i];
-            var segmentEndTicks = boundaries[i + 1];
-            var rule = RequireCoveringRule(intervals, segmentStartTicks, segmentEndTicks);
-
             segments.Add(new BookingRentalSegment(
-                new DateTime(segmentStartTicks, DateTimeKind.Utc),
-                new DateTime(segmentEndTicks, DateTimeKind.Utc),
-                rule.Code,
-                rule.Multiplier,
+                new DateTime(segment.StartsAtTicks, DateTimeKind.Utc),
+                new DateTime(segment.EndsAtTicks, DateTimeKind.Utc),
+                segment.Rule.Code,
+                segment.Rule.Multiplier,
                 hourlyRate));
         }
 
         return segments.AsReadOnly();
+    }
+
+    private static List<RuleInterval>? GetCoveredSegments(
+        DateTime startsAtUtc,
+        DateTime endsAtUtc,
+        IReadOnlyList<BookingPricingRule> rules)
+    {
+        var intervals = ExpandRules(startsAtUtc, endsAtUtc, rules);
+        var boundaries = GetSegmentBoundaries(startsAtUtc, endsAtUtc, intervals);
+        var segments = new List<RuleInterval>();
+
+        // Preserve every rule boundary: merging segments could change price rounding.
+        for (var i = 0; i < boundaries.Length - 1; i++)
+        {
+            var segmentStartTicks = boundaries[i];
+            var segmentEndTicks = boundaries[i + 1];
+            var rule = FindCoveringRule(intervals, segmentStartTicks, segmentEndTicks);
+            if (rule is null)
+            {
+                return null;
+            }
+
+            segments.Add(new RuleInterval(segmentStartTicks, segmentEndTicks, rule));
+        }
+
+        return segments;
     }
 
     private static long[] GetSegmentBoundaries(
@@ -49,24 +81,16 @@ public static class BookingPriceCalculator
         return boundaries.ToArray();
     }
 
-    private static BookingPricingRule RequireCoveringRule(
+    private static BookingPricingRule? FindCoveringRule(
         IReadOnlyList<RuleInterval> intervals,
         long segmentStartTicks,
         long segmentEndTicks)
     {
-        var rule = intervals
+        return intervals
             .Where(interval => interval.StartsAtTicks <= segmentStartTicks
                 && interval.EndsAtTicks >= segmentEndTicks)
             .Select(interval => interval.Rule)
             .MaxBy(rule => rule.Priority);
-
-        if (rule is null)
-        {
-            throw new BookingValidationException(BookingValidationError.MissingTariffCoverage,
-                "The entire booking period must be covered by pricing rules.");
-        }
-
-        return rule;
     }
 
     private static List<RuleInterval> ExpandRules(

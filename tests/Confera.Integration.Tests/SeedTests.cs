@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.IO;
+using Confera.Domain.Bookings;
 using Confera.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -31,7 +32,7 @@ public sealed class SeedTests(PostgresFixture postgres)
             var room = await db.Rooms.Include(x => x.Services).SingleAsync(x => x.Name == "Room A", TestContext.Current.CancellationToken);
             var rules = await db.PricingRules.ToListAsync(TestContext.Current.CancellationToken);
             var start = new DateTime(2026, 9, 15, 11, 0, 0, DateTimeKind.Utc);
-            var booking = room.Book(start, start.AddHours(4), start, room.Services.Select(x => x.Id).ToArray(), rules);
+            var booking = room.Book(RentalPeriod.Create(start, start.AddHours(4)), start, room.Services.Select(x => x.Id).ToArray(), rules);
             db.Add(booking);
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }

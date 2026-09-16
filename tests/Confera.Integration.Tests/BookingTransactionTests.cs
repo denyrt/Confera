@@ -172,7 +172,7 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         await using (var transaction = await store.BeginAsync(TestContext.Current.CancellationToken))
         {
             var loaded = await transaction.GetRoomForUpdateAsync(room.Id, TestContext.Current.CancellationToken);
-            var conflict = loaded!.Book(At(11), At(15), At(9), room.Services.Select(x => x.Id).ToArray(), Rules());
+            var conflict = loaded!.Book(Period(At(11), At(15)), At(9), room.Services.Select(x => x.Id).ToArray(), Rules());
             var error = await Assert.ThrowsAsync<BookingOperationException>(() =>
                 transaction.SaveAsync(conflict, TestContext.Current.CancellationToken));
             Assert.Equal(BookingFailure.RoomUnavailable, error.Failure);

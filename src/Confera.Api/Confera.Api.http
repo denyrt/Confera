@@ -4,8 +4,13 @@
 @wifiId = 00000000-0000-0000-0000-000000000000
 @roomEtag = "replace-with-etag-from-get"
 
-# Set the host from the Aspire API resource. Replace IDs using the read-only
-# query in docs/local-development.md#try-a-booking and choose an available future date.
+# Set the host from the Aspire API resource and choose an available future date.
+# Search first, then copy a room ID and current service IDs from the response into the variables above.
+# Encode a positive offset's + as %2B. Pagination defaults to page=1/pageSize=20 (maximum 100).
+GET {{Confera.Api_HostAddress}}/rooms/availability?start=2030-01-15T11:00:00Z&end=2030-01-15T15:00:00Z&capacity=50&page=1&pageSize=20
+Accept: application/json
+
+### Book a room found by search. Search does not reserve it; a later booking may return 409.
 # Zero IDs below are placeholders and intentionally rejected by the API.
 # With the original Room A values, this returns 201 and a total of 9400 UAH.
 # Use "serviceIds": [] for rental only (8600 UAH).

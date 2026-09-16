@@ -11,7 +11,9 @@ public sealed class BookingTests
     {
         var room = CreateRoom();
         var now = At(10);
-        var booking = room.Book(At(11), At(15), now, room.Services.Select(x => x.Id).ToArray(), InitialRules());
+        var period = RentalPeriod.Create(At(11), At(15));
+        var serviceIds = room.Services.Select(x => x.Id).ToArray();
+        var booking = room.Book(period, now, serviceIds, InitialRules());
 
         Assert.NotEqual(Guid.Empty, booking.Id);
         Assert.Equal(room.Id, booking.RoomId);
@@ -35,9 +37,10 @@ public sealed class BookingTests
     public void Book_ChargesSelectedServiceOnceWithoutTariffMultiplier()
     {
         var room = CreateRoom();
+        var now = At(11);
+        var period = Period(At(12), At(14));
         var projector = room.Services.Single(x => x.Name == "Projector");
-
-        var booking = room.Book(At(12), At(14), At(11), [projector.Id], InitialRules());
+        var booking = room.Book(period, now, [projector.Id], InitialRules());
 
         Assert.Equal(5100m, booking.TotalPrice);
         Assert.Equal(500m, Assert.Single(booking.Services).ServicePriceSnapshot);
@@ -46,7 +49,9 @@ public sealed class BookingTests
     [Fact]
     public void Book_AllowsEmptyServiceSelection()
     {
-        var booking = CreateRoom().Book(At(11), At(15), At(10), [], InitialRules());
+        var period = Period(At(11), At(15));
+        var now = At(10);
+        var booking = CreateRoom().Book(period, now, [], InitialRules());
 
         Assert.Empty(booking.Services);
         Assert.Equal(8600m, booking.TotalPrice);
@@ -56,9 +61,11 @@ public sealed class BookingTests
     public void Book_RejectsDuplicateServiceIds()
     {
         var room = CreateRoom();
+        var period = Period(At(11), At(15));
+        var now = At(10);
         var id = room.Services.First().Id;
 
-        var error = Assert.Throws<BookingValidationException>(() => room.Book(At(11), At(15), At(10), [id, id], InitialRules()));
+        var error = Assert.Throws<BookingValidationException>(() => room.Book(period, now, [id, id], InitialRules()));
         Assert.Equal(BookingValidationError.InvalidServiceSelection, error.Error);
     }
 
@@ -69,7 +76,7 @@ public sealed class BookingTests
         var anotherRoomsService = CreateRoom().Services.First().Id;
 
         var error = Assert.Throws<BookingValidationException>(() =>
-            room.Book(At(11), At(15), At(10), [anotherRoomsService], InitialRules()));
+            room.Book(Period(At(11), At(15)), At(10), [anotherRoomsService], InitialRules()));
         Assert.Equal(BookingValidationError.InvalidServiceSelection, error.Error);
     }
 
@@ -77,11 +84,11 @@ public sealed class BookingTests
     public void Book_PreservesSnapshotsAfterRoomAndServicesChange()
     {
         var room = CreateRoom();
-        var booking = room.Book(At(11), At(15), At(10), room.Services.Select(x => x.Id).ToArray(), InitialRules());
+        var booking = room.Book(Period(At(11), At(15)), At(10), room.Services.Select(x => x.Id).ToArray(), InitialRules());
 
         room.SetHourlyRate(3000m);
         room.SetServices([new("Projector", 900m), new("Sound", 700m)]);
-        var newBooking = room.Book(At(11), At(15), At(10), room.Services.Select(x => x.Id).ToArray(),
+        var newBooking = room.Book(Period(At(11), At(15)), At(10), room.Services.Select(x => x.Id).ToArray(),
             [Rule("new", 9, 18, 2m)]);
 
         Assert.Equal(2000m, booking.HourlyRateSnapshot);
@@ -99,7 +106,7 @@ public sealed class BookingTests
     {
         var room = new Room("Small segment", 1, 1000m);
 
-        var booking = room.Book(At(9), At(9, 30), At(9), [],
+        var booking = room.Book(Period(At(9), At(9, 30)), At(9), [],
             [Rule("day", 9, 18), new("edge", "Edge", new TimeOnly(9, 0), new TimeOnly(9, 0).Add(TimeSpan.FromTicks(10)), 0.5m, 20)]);
 
         Assert.Equal(500m, booking.TotalPrice);
@@ -116,7 +123,7 @@ public sealed class BookingTests
             new("second", "Second", new TimeOnly(9, 29), new TimeOnly(10, 0), 1m, 1)
         ];
 
-        var booking = room.Book(At(9), At(9, 30), At(9), [], rules);
+        var booking = room.Book(Period(At(9), At(9, 30)), At(9), [], rules);
 
         Assert.Equal(new[] { 870m, 30m }, booking.PriceSegments.Select(x => x.Price));
         Assert.Equal(900m, booking.TotalPrice);
@@ -128,8 +135,10 @@ public sealed class BookingTests
     [InlineData(1440)]
     public void Book_AcceptsDurationBoundsAndNonMultipleOf30(int minutes)
     {
-        var booking = CreateRoom().Book(At(10), At(10).AddMinutes(minutes), At(10), [],
-            [Rule("day", 9, 18), Rule("night", 18, 9)]);
+        var now = At(10);
+        var period = Period(At(10), At(10).AddMinutes(minutes));
+
+        var booking = CreateRoom().Book(period, now, [], [Rule("day", 9, 18), Rule("night", 18, 9)]);
 
         Assert.Equal(TimeSpan.FromMinutes(minutes), booking.EndsAtUtc - booking.StartsAtUtc);
     }
@@ -141,7 +150,7 @@ public sealed class BookingTests
     [InlineData(1441)]
     public void Book_RejectsInvalidDuration(int minutes)
     {
-        Assert.ThrowsAny<ArgumentException>(() => CreateRoom().Book(At(10), At(10).AddMinutes(minutes),
+        Assert.ThrowsAny<ArgumentException>(() => CreateRoom().Book(Period(At(10), At(10).AddMinutes(minutes)),
             At(9), [], InitialRules()));
     }
 
@@ -154,14 +163,14 @@ public sealed class BookingTests
             ? TimeSpan.FromMinutes(30).Subtract(TimeSpan.FromTicks(10))
             : TimeSpan.FromHours(24).Add(TimeSpan.FromTicks(10));
 
-        Assert.Throws<BookingValidationException>(() => CreateRoom().Book(At(10), At(10).Add(duration),
+        Assert.Throws<BookingValidationException>(() => CreateRoom().Book(Period(At(10), At(10).Add(duration)),
             At(9), [], InitialRules()));
     }
 
     [Fact]
     public void Book_RejectsPastStart()
     {
-        var error = Assert.Throws<BookingValidationException>(() => CreateRoom().Book(At(10), At(11), At(10).AddTicks(10), [], InitialRules()));
+        var error = Assert.Throws<BookingValidationException>(() => CreateRoom().Book(Period(At(10), At(11)), At(10).AddTicks(10), [], InitialRules()));
         Assert.Equal(BookingValidationError.InvalidPeriod, error.Error);
     }
 
@@ -194,11 +203,11 @@ public sealed class BookingTests
 
         if (changedTime == 2)
         {
-            Assert.Throws<ArgumentException>(() => CreateRoom().Book(start, end, now, [], InitialRules()));
+            Assert.Throws<ArgumentException>(() => CreateRoom().Book(Period(start, end), now, [], InitialRules()));
         }
         else
         {
-            Assert.Throws<BookingValidationException>(() => CreateRoom().Book(start, end, now, [], InitialRules()));
+            Assert.Throws<BookingValidationException>(() => CreateRoom().Book(Period(start, end), now, [], InitialRules()));
         }
     }
 
@@ -207,15 +216,15 @@ public sealed class BookingTests
     {
         var room = CreateRoom();
 
-        Assert.Throws<BookingValidationException>(() => room.Book(At(10), At(11), At(9), null!, InitialRules()));
-        Assert.Throws<ArgumentNullException>(() => room.Book(At(10), At(11), At(9), [], null!));
+        Assert.Throws<BookingValidationException>(() => room.Book(Period(At(10), At(11)), At(9), null!, InitialRules()));
+        Assert.Throws<ArgumentNullException>(() => room.Book(Period(At(10), At(11)), At(9), [], null!));
     }
 
     [Fact]
     public void Book_DoesNotExposeMutableCollections()
     {
         var room = CreateRoom();
-        var booking = room.Book(At(11), At(15), At(10), room.Services.Select(x => x.Id).ToArray(), InitialRules());
+        var booking = room.Book(Period(At(11), At(15)), At(10), room.Services.Select(x => x.Id).ToArray(), InitialRules());
 
         Assert.Throws<NotSupportedException>(() => ((ICollection<RoomService>)room.Services).Clear());
         Assert.Throws<NotSupportedException>(() => ((ICollection<BookedRoomServiceSnapshot>)booking.Services).Clear());

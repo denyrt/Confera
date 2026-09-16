@@ -25,7 +25,7 @@ public sealed class PersistenceContractTests
         var multiplier = decimal.Parse(multiplierText, CultureInfo.InvariantCulture);
         var room = new Room("Room", 1, rate);
         room.SetServices([new("Service", price)]);
-        var booking = room.Book(At(10), At(11), At(9), room.Services.Select(x => x.Id).ToArray(), [Rule("Day", 9, 18, multiplier)]);
+        var booking = room.Book(Period(At(10), At(11)), At(9), room.Services.Select(x => x.Id).ToArray(), [Rule("Day", 9, 18, multiplier)]);
         Assert.Equal(decimal.Round(rate * multiplier, 3, MidpointRounding.AwayFromZero) + price, booking.TotalPrice);
         Assert.False(room.IsDeleted);
     }
@@ -80,10 +80,10 @@ public sealed class PersistenceContractTests
     public void FineTimeInputIsRejectedBeforeCalculationAndClockIsFloored()
     {
         var room = new Room("Room", 1, 1000m);
-        Assert.Throws<BookingValidationException>(() => room.Book(At(10).AddTicks(1), At(11), At(9), [], InitialRules()));
-        Assert.Throws<BookingValidationException>(() => BookingPriceCalculator.Calculate(At(10), At(11).AddTicks(1), 1000m, InitialRules()));
+        Assert.Throws<BookingValidationException>(() => room.Book(Period(At(10).AddTicks(1), At(11)), At(9), [], InitialRules()));
+        Assert.Throws<BookingValidationException>(() => BookingPriceCalculator.Calculate(Period(At(10), At(11).AddTicks(1)), 1000m, InitialRules()));
         Assert.Throws<ArgumentException>(() => new BookingPricingRule("Fine", "Fine", new TimeOnly(10, 0).Add(TimeSpan.FromTicks(1)), new TimeOnly(11, 0), 1m, 0));
-        var booking = room.Book(At(10), At(11), At(10).AddTicks(9), [], InitialRules());
+        var booking = room.Book(Period(At(10), At(11)), At(10).AddTicks(9), [], InitialRules());
         Assert.Equal(At(10), booking.CreatedAtUtc);
         Assert.Equal(new DateTime(DateTime.MaxValue.Ticks - 9, DateTimeKind.Utc), UtcPrecision.Floor(DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)));
     }

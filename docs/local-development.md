@@ -17,7 +17,7 @@ dotnet run --project orchestration/Confera.AppHost --configuration Release --no-
 
 Open the dashboard URL printed by AppHost and use its API resource endpoint.
 The development API exposes `/health`, `/alive`, `/openapi/v1.json`, and Swagger
-UI at `/swagger`, with booking and room-management endpoints. Stop AppHost
+UI at `/swagger`, with availability, booking, and room-management endpoints. Stop AppHost
 with Ctrl+C.
 
 The default launch profile uses HTTPS and the local ASP.NET development
@@ -88,19 +88,25 @@ and maximum microsecond instants are verified by a real database round trip.
 
 ## Try a booking
 
-Open the API's `/swagger` page. Obtain the room and service IDs from the local
-database using an SQL client connected through the Aspire database resource.
-Until A1 exposes availability and current offerings, this read-only query gives
-the IDs needed by the request:
+Open the API's `/swagger` page and search for a future available period:
 
-```sql
-SELECT r."Id" AS "RoomId", r."Name" AS "RoomName", r."HourlyRate",
-       s."Id" AS "ServiceId", s."Name" AS "ServiceName", s."Price"
-FROM "Rooms" r
-LEFT JOIN "RoomServices" s ON s."RoomId" = r."Id"
-WHERE NOT r."IsDeleted"
-ORDER BY r."Name", s."Name";
+```http
+GET /rooms/availability?start=2030-01-15T11:00:00Z&end=2030-01-15T15:00:00Z&capacity=50&page=1&pageSize=20
 ```
+
+Copy a room's id and the desired service IDs from items into the booking request.
+The response includes current names, capacity, base hourlyRate, currency UAH,
+and services with id/name/price. It does not estimate the period's rental price.
+Room order is capacity then ID. page defaults to 1; pageSize defaults to 20 and
+must be 1-100. hasNextPage indicates another matching room at read time; no
+totalCount is returned. Invalid query input is 400. An uncovered period, no
+matching rooms, or a page beyond the results returns 200 with empty items and
+hasNextPage false. For explicit positive offsets, encode + as %2B in the URL.
+
+Search does not reserve rooms. Availability and current rates/services may change
+before booking or between page requests; POST /bookings validates again. Search
+uses Cache-Control: no-store. Its [contract](a1-availability-search-plan.md)
+describes timestamp limits, errors, and read consistency.
 
 Use a future, available date; replace the example identifiers with actual IDs.
 The [HTTP request file](../src/Confera.Api/Confera.Api.http) supplies the same
@@ -141,7 +147,7 @@ public booking retrieval/cancellation operations in the agreed assignment scope.
 Use Swagger or the [HTTP request file](../src/Confera.Api/Confera.Api.http).
 POST /rooms accepts name, capacity, hourlyRate and services (each has name/price).
 It returns 201, room/service IDs and Location pointing to GET /rooms/{id}.
-For seeded rooms, the SQL lookup above supplies the initial room ID; subsequent
+For seeded rooms, availability search above supplies a room ID; subsequent
 GETs supply all current details and service IDs.
 
 1. GET /rooms/{id}; copy its ETag response header, including quotes.

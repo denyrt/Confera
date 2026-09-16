@@ -5,7 +5,7 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
-This section describes D1, P1 persistence, B1 booking, and R1 room management.
+This section describes D1, P1 persistence, B1 booking, R1 room management, and A1 search.
 
 | Model | Responsibility |
 | --- | --- |
@@ -16,6 +16,7 @@ This section describes D1, P1 persistence, B1 booking, and R1 room management.
 | `BookedRoomServiceSnapshot` | The selected service name and price recorded for a booking. |
 | `BookingPriceSegment` | A portion of a booking with the applicable tariff and price recorded. |
 | `BookingRentalSegment` | An immutable calculated rental segment without booking ownership or persistence identity. |
+| `RentalPeriod` | An immutable validated UTC interval with microsecond precision and a duration of 30 minutes to 24 hours. |
 
 Room details can be updated through validated methods. Replacing room services
 validates the complete input before changing the collection, requires unique
@@ -38,6 +39,12 @@ before checking the start and recording creation time.
 selecting the highest-priority rule at each boundary. It requires full tariff
 coverage, handles daily rules crossing midnight, and rounds each segment to
 three fractional digits using `MidpointRounding.AwayFromZero`.
+
+`RentalPeriod.Create(...)` validates the interval once for callers of Room.Book
+and the calculator. BookingValidation.RequireBookingPeriod additionally checks
+the start against a supplied current time. HasFullCoverage and Calculate share
+tariff expansion and segment selection; a coverage query needs no hourly rate.
+Missing coverage returns false, while malformed configurations remain errors.
 
 `BookingPricingRule.ValidateSet(...)` rejects every duplicate priority in the
 complete configuration, including disjoint, adjacent or masked rules and rules
@@ -115,15 +122,18 @@ same interval.
 
 The booking operation is implemented under B1. Its
 [approved plan](b1-booking-implementation-plan.md#5-http-contract) records the
-request, response, and error codes. Availability search under A1 must include
-the room's current service IDs, names, and prices so clients can select
-room-specific services for a subsequent booking.
+request, response, and error codes. A1 exposes GET /rooms/availability through
+SearchAvailabilityService with start/end, minimum capacity, and page/pageSize.
+It returns current room data and service IDs/names/prices for a subsequent booking.
+The result includes hasNextPage, without a total count or period-price estimate.
+It reads tariffs once, then eligible rooms and services in one paginated query;
+missing coverage returns an empty page. See the [A1 contract](a1-availability-search-plan.md).
 
 R1 exposes room creation, full replacement, soft deletion and room-by-ID reading.
 PUT and deletion of an active room require If-Match; stale versions return 412
 and missing conditions 428. Repeated deletion returns 204 even with an old or
 missing version. See the [R1 contract](r1-room-management-plan.md) for complete
-request, precondition, response and failure semantics. Availability remains A1.
+request, precondition, response and failure semantics.
 
 Separate public endpoints for price quotes, booking retrieval, cancellation,
 rescheduling, and pricing-rule management are outside this scope. Application

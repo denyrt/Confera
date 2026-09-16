@@ -13,6 +13,7 @@ namespace Confera.Integration.Tests;
 internal static class BookingTestSupport
 {
     internal static DateTime At(int hour) => new(2030, 1, 15, hour, 0, 0, DateTimeKind.Utc);
+    internal static RentalPeriod Period(DateTime startsAtUtc, DateTime endsAtUtc) => RentalPeriod.Create(startsAtUtc, endsAtUtc);
 
     internal static async Task<(Room Room, Room Other)> SeedAsync(TestDatabase database)
     {

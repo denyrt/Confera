@@ -22,8 +22,8 @@ public sealed class PersistenceTests(PostgresFixture postgres)
         var maximum = new DateTime(DateTime.MaxValue.Ticks - 9, DateTimeKind.Utc);
         var room = new Room("Finite", 1, 1000m);
         BookingPricingRule[] rules = [new("Night", "Night", new TimeOnly(22, 0), new TimeOnly(6, 0), 1m, 0)];
-        var first = room.Book(minimum, minimum.AddMinutes(30), minimum, [], rules);
-        var last = room.Book(maximum.AddMinutes(-30), maximum, maximum.AddMinutes(-30), [], rules);
+        var first = room.Book(RentalPeriod.Create(minimum, minimum.AddMinutes(30)), minimum, [], rules);
+        var last = room.Book(RentalPeriod.Create(maximum.AddMinutes(-30), maximum), maximum.AddMinutes(-30), [], rules);
         await using (var db = database.Context())
         {
             db.Add(room);
@@ -59,7 +59,7 @@ public sealed class PersistenceTests(PostgresFixture postgres)
         await using var database = await postgres.CreateDatabaseAsync();
         var room = new Room("Room A", 50, 2000m);
         room.SetServices([new("Projector", 500m), new("Wi-Fi", 300m)]);
-        var booking = room.Book(At(11).AddTicks(10), At(15), At(10).AddTicks(1), room.Services.Select(x => x.Id).ToArray(), Rules);
+        var booking = room.Book(RentalPeriod.Create(At(11).AddTicks(10), At(15)), At(10).AddTicks(1), room.Services.Select(x => x.Id).ToArray(), Rules);
         await using (var db = database.Context())
         {
             db.Add(room);

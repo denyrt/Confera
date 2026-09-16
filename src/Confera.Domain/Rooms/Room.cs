@@ -152,15 +152,14 @@ public sealed class Room
 
     /// <summary>Creates a priced booking; availability and persistence are coordinated by the caller.</summary>
     public Booking Book(
-        DateTime startsAtUtc,
-        DateTime endsAtUtc,
+        RentalPeriod period,
         DateTime nowUtc,
         IReadOnlyList<Guid> serviceIds,
         IReadOnlyList<BookingPricingRule> rules)
     {
         EnsureActive();
         nowUtc = UtcPrecision.Floor(nowUtc);
-        BookingValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
+        BookingValidation.RequireBookingPeriod(period, nowUtc);
         BookingValidation.RequireServiceIds(serviceIds);
         ArgumentNullException.ThrowIfNull(rules, nameof(rules));
 
@@ -172,9 +171,9 @@ public sealed class Room
             .Select(x => new RoomServiceData(x.Name, x.Price))
             .ToArray();
 
-        var segments = BookingPriceCalculator.Calculate(startsAtUtc, endsAtUtc, HourlyRate, rules);
+        var segments = BookingPriceCalculator.Calculate(period, HourlyRate, rules);
 
-        return new Booking(Id, startsAtUtc, endsAtUtc, nowUtc, HourlyRate, selectedServices, segments);
+        return new Booking(Id, period.StartsAtUtc, period.EndsAtUtc, nowUtc, HourlyRate, selectedServices, segments);
     }
 
     private void EnsureServiceIdsExist(IEnumerable<Guid> serviceIds)

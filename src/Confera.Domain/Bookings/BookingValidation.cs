@@ -2,6 +2,15 @@ namespace Confera.Domain.Bookings;
 
 public static class BookingValidation
 {
+    /// <summary>
+    /// Checks date-time interval to be a valid <see cref="RentalPeriod"/>.
+    /// </summary>
+    /// <param name="startsAtUtc"> Start of interval. </param>
+    /// <param name="endsAtUtc"> End of internal. </param>
+    /// <exception cref="BookingValidationException"></exception>
+    /// <remarks>
+    /// UTC kind, whole-microseconds precision, duration between 30 minutes and 24 hours are required to be valid interval.
+    /// </remarks>
     public static void RequireRentalPeriod(DateTime startsAtUtc, DateTime endsAtUtc)
     {
         try
@@ -22,16 +31,15 @@ public static class BookingValidation
         }
     }
 
-    public static void RequireBookingPeriod(DateTime startsAtUtc, DateTime endsAtUtc, DateTime nowUtc)
+    public static void RequireBookingPeriod(RentalPeriod period, DateTime nowUtc)
     {
-        RequireRentalPeriod(startsAtUtc, endsAtUtc);
+        ArgumentNullException.ThrowIfNull(period);
         // A bad application clock is an internal error, not invalid client input.
         DomainValidation.RequireUtc(nowUtc, nameof(nowUtc));
 
-        if (startsAtUtc < nowUtc)
+        if (period.StartsAtUtc < nowUtc)
         {
-            throw new BookingValidationException(BookingValidationError.InvalidPeriod,
-                "Booking cannot start in the past.");
+            throw new BookingValidationException(BookingValidationError.InvalidPeriod, "Booking cannot start in the past.");
         }
     }
 

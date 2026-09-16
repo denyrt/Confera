@@ -1,3 +1,4 @@
+using Confera.Application.Availability;
 using Confera.Application.Bookings;
 using Confera.Application.Rooms;
 using Confera.Domain.Bookings;
@@ -17,6 +18,10 @@ internal sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) :
 
         var (status, code, detail) = exception switch
         {
+            AvailabilityOperationException { Failure: AvailabilityFailure.InvalidRequest } =>
+                (400, "invalid_request", "Supply explicit-offset timestamps, a positive capacity and valid page/pageSize values."),
+            AvailabilityOperationException { Failure: AvailabilityFailure.PersistenceUnavailable } =>
+                (503, "availability_persistence_unavailable", "Availability search is temporarily unavailable."),
             RoomValidationException error => (400, "invalid_room_data", error.Message),
             RoomOperationException { Failure: RoomFailure.InvalidRequest } =>
                 (400, "invalid_request", "Supply a nonempty room ID and valid explicit entity tags in If-Match; wildcard * is not supported."),

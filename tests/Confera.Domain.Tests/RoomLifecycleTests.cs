@@ -11,7 +11,7 @@ public sealed class RoomLifecycleTests
         var room = CreateRoom();
         var projector = room.Services.Single(x => x.Name == "Projector");
         var wifi = room.Services.Single(x => x.Name == "Wi-Fi");
-        var booking = room.Book(At(11), At(15), At(9), [projector.Id, wifi.Id], InitialRules());
+        var booking = room.Book(Period(At(11), At(15)), At(9), [projector.Id, wifi.Id], InitialRules());
         var version = room.Version;
 
         room.Update(new RoomDetails(" Renamed ", 60, 2500m, [new("projector", 600m), new("Internet", 400m)]));
@@ -33,7 +33,7 @@ public sealed class RoomLifecycleTests
         var room = CreateRoom();
         var version = room.Version;
         room.Update(new RoomDetails(" Room ", 50, 2000.000m, [new("Wi-Fi", 300m), new("Projector", 500.000m)]));
-        room.Book(At(11), At(15), At(9), [], InitialRules());
+        room.Book(Period(At(11), At(15)), At(9), [], InitialRules());
         Assert.Equal(version, room.Version);
     }
 
@@ -101,7 +101,7 @@ public sealed class RoomLifecycleTests
         Assert.Equal(deleted, room.Version);
         Assert.Equal(2, room.Services.Count);
         Assert.Throws<InvalidOperationException>(() => room.Update(new RoomDetails("Other", 1, 1000m, [])));
-        Assert.Throws<InvalidOperationException>(() => room.Book(At(11), At(15), At(9), [], InitialRules()));
+        Assert.Throws<InvalidOperationException>(() => room.Book(Period(At(11), At(15)), At(9), [], InitialRules()));
     }
 
     private static Room CreateRoom()
