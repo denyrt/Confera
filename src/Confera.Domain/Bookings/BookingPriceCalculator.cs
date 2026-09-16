@@ -6,6 +6,7 @@ public static class BookingPriceCalculator
     /// <remarks>Invalid periods and rule configurations throw; missing coverage returns false.</remarks>
     public static bool HasFullCoverage(RentalPeriod period, IReadOnlyList<BookingPricingRule> rules)
     {
+        ArgumentNullException.ThrowIfNull(period);
         BookingPricingRule.ValidateSet(rules);
 
         return GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules) is not null;

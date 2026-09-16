@@ -6,9 +6,9 @@ The project covers conference room management, availability search, bookings, re
 
 ## Project status
 
-Room creation, reading, replacement and soft deletion, transactional booking
-creation through `POST /bookings`, Domain pricing, and PostgreSQL persistence
-are implemented. Bookings
+Room creation, reading, replacement and soft deletion, paginated availability
+search, transactional booking creation through `POST /bookings`, Domain pricing,
+and PostgreSQL persistence are implemented. Bookings
 preserve UTC microsecond instants, rounded tariff segments, selected services,
 and prices as historical snapshots. PostgreSQL enforces active room/service
 name integrity, globally unique tariff priorities, and concurrent booking
@@ -29,7 +29,8 @@ Room updates and deletion share booking's room-row lock. Capacity reduction and
 deletion reject ongoing/future bookings. GET returns an ETag; PUT and deletion
 of an active room require If-Match to prevent stale writes. Room/service changes
 rotate a UUID version; no-op replacements and bookings retain it. Availability
-search and both reports remain planned. The roadmap records validation and
+search shares the validated RentalPeriod and tariff coverage with booking;
+both reports remain planned. The roadmap records validation and
 merge status separately from implemented behavior.
 
 The original requirements and project decisions are documented separately:
@@ -41,7 +42,7 @@ The original requirements and project decisions are documented separately:
 - [Complete P1 persistence specification and implementation plan](docs/p1-persistence-specification.md).
 - [Approved B1 booking implementation plan and API contract](docs/b1-booking-implementation-plan.md).
 - [Approved R1 room management and concurrency contract](docs/r1-room-management-plan.md).
-- [Agreed A1 availability search specification; implementation awaiting confirmation](docs/a1-availability-search-plan.md).
+- [A1 availability search contract, implementation plan, and validation](docs/a1-availability-search-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/p1-validation.md).
 
@@ -68,6 +69,15 @@ Use the dashboard's API resource link for `/swagger`, `/openapi/v1.json`,
 `/health`, and `/alive`. Local initialization creates
 Room A/B/C, six room-specific service offerings, and four tariffs once. Later
 starts preserve edits and deletions.
+
+`GET /rooms/availability?start=2030-01-15T11:00:00Z&end=2030-01-15T15:00:00Z&capacity=50`
+returns available rooms with base hourly rates and current service IDs/prices.
+Use a future period, explicit-offset timestamps, and a positive minimum capacity.
+Optional page/pageSize default to 1/20, with a maximum size of 100. Results use
+items, page, pageSize and hasNextPage, ordered by capacity then ID; no total
+count or period-price quote is calculated. Missing tariff coverage or no matches
+returns an empty page. Search does not reserve rooms; booking checks again.
+See [search and booking examples](docs/local-development.md#try-a-booking).
 
 `POST /bookings` requires `roomId`, `start`, `end`, and `serviceIds` (`[]` is
 allowed). Timestamps require `Z` or an explicit offset, normalize to UTC, and

@@ -1,3 +1,4 @@
+using Confera.Application.Availability;
 using Confera.Application.Bookings;
 using Confera.Application.Rooms;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,7 @@ public static class PersistenceConfiguration
         services.AddDbContextFactory<ConferaDbContext>(options => Configure(options, connection, workerRetries));
         services.AddScoped<IBookingStore, BookingStore>();
         services.AddScoped<IRoomStore, RoomStore>();
+        services.AddScoped<IAvailabilityReader, AvailabilityReader>();
         return services;
     }
 

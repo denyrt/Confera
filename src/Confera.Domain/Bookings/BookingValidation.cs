@@ -33,6 +33,7 @@ public static class BookingValidation
 
     public static void RequireBookingPeriod(RentalPeriod period, DateTime nowUtc)
     {
+        ArgumentNullException.ThrowIfNull(period);
         // A bad application clock is an internal error, not invalid client input.
         DomainValidation.RequireUtc(nowUtc, nameof(nowUtc));
 

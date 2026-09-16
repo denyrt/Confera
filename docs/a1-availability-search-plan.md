@@ -1,10 +1,10 @@
 # A1: Availability search specification and implementation plan
 
-The maintainer approved the plan and decisions on 2026-09-16, but explicitly
-authorized only creation of the feature branch and this specification first.
-**Implementation requires a separate, explicit maintainer confirmation after
-reviewing this document.** Plan approval and documentation validation do not
-authorize application code, new tests, or runtime configuration changes yet.
+The maintainer approved the plan and decisions on 2026-09-16, initially
+authorizing branch/specification preparation only. After Domain unit 1 and the
+maintainer's RentalPeriod refactor (fb72fc2), the maintainer explicitly authorized
+unit 2 and subsequent units, including implementation, verification, and
+documentation. The earlier approval gate has been satisfied.
 
 This document records the agreed contract in English, following the B1/R1 plans.
 Delivery status belongs in the [roadmap](implementation-roadmap.md); actual
@@ -45,11 +45,11 @@ service filters, configurable sort modes, or reports under A1.
 ## 2. Existing foundation and affected components
 
 P1, B1, and R1 are merged prerequisites. Existing reusable behavior includes
-BookingValidation, BookingPriceCalculator, room/service response fields,
+RentalPeriod, BookingValidation, BookingPriceCalculator, room/service response fields,
 the booking overlap predicate, provider-error classification, controlled test
 clocks, and the isolated PostgreSQL/HTTP test fixtures.
 
-| Component | Intended change after implementation confirmation |
+| Component | Implementation scope |
 | --- | --- |
 | Domain | Reuse period validation and extract a small shared tariff-coverage mechanism from the existing calculator. |
 | Application | One availability use case, search input/page result, and a focused read contract. |
@@ -180,7 +180,8 @@ UTC/precision, ordering, and availability limitations in OpenAPI/Swagger.
 
 ### Shared tariff interpretation
 
-Reuse BookingValidation for the rental period and past-start rule. Extract
+Reuse RentalPeriod.Create for interval validation and BookingValidation for the
+past-start rule, following the maintainer's refactor. Extract
 only the small common coverage/interval logic needed by search and the current
 BookingPriceCalculator. Preserve daily expansion, previous-day occurrences of
 overnight rules, clipping, full coverage, and complete-set priority validation.
@@ -289,8 +290,9 @@ full diff. Record actual commands/results and material unavailable checks.
 ## 6. Ordered implementation and documentation
 
 1. Create the feature branch and save this specification, with README/roadmap
-   links and solution registration. This is the currently authorized stage.
-2. Obtain the maintainer's separate confirmation to start full implementation.
+   links and solution registration. This preparation stage is complete.
+2. Obtain the maintainer's separate confirmation to start full implementation
+   (received after unit 1 and the RentalPeriod refactor).
 3. Add shared Domain coverage behavior and its regression checks.
 4. Add the Application search contract/use case and the Infrastructure read
    implementation, with period, coverage, filtering, and pagination tests.
@@ -301,15 +303,13 @@ full diff. Record actual commands/results and material unavailable checks.
    progress and verification evidence in the roadmap and this document.
 7. Run the final checks, review all changes, and hand off the verified result.
 
-Continue on feature/availability-search when implementation is authorized.
+Continue on feature/availability-search under the implementation authorization.
 No material business decision remains unresolved. Routine private helper/type
 names may be chosen during implementation; new material scope, contract, or
 architecture changes require discussion under the agent workflow.
 
-A1 remains Planned during this documentation stage. After implementation starts
-it becomes In progress, then Verified only when the contract and relevant checks
-pass. H1 can become Verified when its complete operation set is verified. Done
-requires confirmed merge and the final roadmap update under CONTRIBUTING.
+A1 was Planned during preparation. A1 and H1 are now Verified with the evidence
+below. Done requires confirmed merge and the final roadmap update under CONTRIBUTING.
 Q1 reports remain separate. This request does not authorize committing, pushing,
 creating a PR, or merging.
 
@@ -320,8 +320,8 @@ origin/main. Created feature/availability-search from 39ca4cc with --no-track;
 the branch has no upstream. The initial working tree was clean.
 
 Only this specification, README/roadmap references, and solution registration
-are part of the preparation change. A1 runtime behavior and tests have not been
-implemented. Existing B1/R1 test evidence is not A1 acceptance evidence.
+were part of the preparation change. A1 runtime behavior and tests had not been
+implemented at that stage. Existing B1/R1 test evidence was not A1 acceptance evidence.
 
 Documentation-stage validation on 2026-09-16:
 
@@ -333,5 +333,73 @@ Documentation-stage validation on 2026-09-16:
 | Diff review | Only the specification, README, roadmap, and solution registration changed; tracked and new-document whitespace checks passed. |
 | Runtime tests | Not run for this documentation-only change; A1 acceptance tests remain future implementation work. |
 
-Preparation is complete. A1 remains Planned and awaits separate implementation
-confirmation; no commit, push, PR, or merge was performed.
+At the preparation handoff, A1 remained Planned and awaited implementation
+confirmation; no commit, push, PR, or merge was performed by the agent then.
+The maintainer subsequently published the feature branch and authorized further
+implementation as recorded above.
+
+## 8. Implementation and validation record
+
+Verified on 2026-09-16 on Windows with Docker Desktop Linux containers and
+PostgreSQL 18.6. Work continued on feature/availability-search from fb72fc2,
+the maintainer's RentalPeriod refactor following unit 1. Its validated period
+is reused throughout search; explicit null guards were added to the two Domain
+entry points that now accept it. Existing pricing and booking behavior passed
+regression checks. These implementation changes remain local and unmerged.
+
+Delivered behavior:
+
+- GET /rooms/availability validates explicit-offset timestamps, capacity and
+  pagination, captures one canonical clock value, and reuses Domain coverage.
+- Application reads tariffs once; missing coverage returns an empty page
+  without a room query. The covered path adds one PostgreSQL statement for
+  filtered/paged rooms and ordered current services, with no count query.
+- The endpoint returns items/page/pageSize/hasNextPage and no-store, with safe
+  errors, cancellation, and OpenAPI required fields, defaults, ranges and schemas.
+- The shared API timestamp parser retains booking's accepted ISO formats and
+  rejects nonzero sub-microsecond digits before parsing can discard them.
+- README, domain/rule documentation, local development and HTTP examples now
+  show search followed by booking with returned room/service IDs. No packages,
+  schema changes, reports, or changes to B1/R1 write transactions were needed.
+
+| Check | Result |
+| --- | --- |
+| Tool/package restore | Passed. |
+| Release build | Passed; zero warnings and errors. |
+| Domain | 111 passed, zero skipped. |
+| Application | 45 passed, zero skipped. |
+| PostgreSQL/HTTP integration | 122 passed, zero skipped. |
+| AppHost/worker | 12 passed, zero skipped. |
+| EF model consistency | No pending model changes; no migration needed. |
+| Documentation/solution | Local links/anchors, solution paths, and Markdown registrations verified. |
+| C# formatting and diff whitespace | Passed. |
+
+All 290 tests passed. Added coverage includes tariff gaps/overnight periods,
+shared pricing semantics, validation before reads, page boundaries and overflow,
+stable ordering with multiple services, every overlap direction and adjacency,
+bounded SQL reads, current R1 offerings usable by B1, and the absence of a
+reservation after search. Controlled command interception verifies safe errors,
+no retries, and cancellation of an executing PostgreSQL query. HTTP tests cover
+query parsing, shared booking timestamp compatibility, and OpenAPI metadata.
+The full suites also retain B1/R1 and AppHost/worker regression coverage.
+
+The restore, build and four suite commands in section 5 were executed. Successful
+TRX reports are under artifacts/tests/a1, with UTC filename timestamps
+20:06:38 (Domain/Application), 20:14:22 (Integration), and 20:17:28 (AppHost),
+dated 2026-09-16. Earlier integration runs exposed missing required/default
+OpenAPI metadata; this was corrected and the full suite rerun successfully.
+An initial AppHost run failed because a Testcontainers-specific DOCKER_HOST
+override was also passed to Docker CLI. Removing the override, as documented
+for local Windows development, allowed all 12 AppHost tests to pass; no
+application change was needed for that environment issue.
+
+The EF check used the existing design-time procedure:
+
+```powershell
+$env:ConnectionStrings__confera = 'Host=localhost;Database=design_time_only'
+dotnet ef migrations has-pending-model-changes --project src/Confera.Infrastructure --configuration Release --no-build
+```
+
+A1 and H1 are Verified locally. Hosted Linux CI was not run for these changes.
+No commit, push, PR, or merge was performed during this implementation; Q1
+reports remain planned.

@@ -56,6 +56,21 @@ reserve a room. B1 coordinates these checks in Application, and persistence
 prevents overlapping bookings even when requests arrive concurrently.
 Adjacent bookings are allowed under the `[start, end)` interval convention.
 
+GET /rooms/availability requires start/end and a positive capacity. Optional
+page/pageSize default to 1/20, with size 1-100; invalid input returns 400.
+The response contains items, page, pageSize, and hasNextPage, ordered by capacity
+then ID. Items include the base hourly rate and current services; no period-price
+quote or total count is calculated. Missing tariff coverage, including no rules,
+returns a successful empty page; invalid configuration remains an internal error.
+
+Search captures one UTC clock value before reading and uses RentalPeriod plus
+the shared Domain coverage logic. It reads tariffs once, then filters/paginates
+rooms and includes services in one statement. The page query sees a coherent
+room/service/booking state, but its snapshot can differ from the tariff read.
+Search uses no explicit transaction or row locks. Each page is a fresh read;
+concurrent changes can shift results. Responses use no-store, and booking still
+checks all current conditions. See the [A1 contract](a1-availability-search-plan.md).
+
 ### Booking transaction and room changes
 
 B1 opens a fresh context and a short Read Committed transaction, acquires

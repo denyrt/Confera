@@ -44,8 +44,8 @@ alongside their corresponding application use cases.
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
 | B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
 | R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](r1-room-management-plan.md#validation-record). |
-| A1 | Availability search | In Progress | [Specification and plan](a1-availability-search-plan.md) agreed on 2026-09-16; feature branch/documentation prepared. Full implementation awaits separate maintainer confirmation. |
-| H1 | Complete the five business API operations | In progress | Four core operations verified through B1 and R1, plus the supporting room GET; availability search remains A1. |
+| A1 | Availability search | Verified | GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](a1-availability-search-plan.md#8-implementation-and-validation-record); implementation is unmerged. |
+| H1 | Complete the five business API operations | Verified | B1, R1, and A1 supply all five core operations, plus the supporting room GET. HTTP/OpenAPI and all 290 tests passed; A1 awaits merge. |
 | Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
 
 ### D1: Domain booking creation and tariff pricing
@@ -260,8 +260,9 @@ final delivery. A1 and reports remain separate tasks.
 
 The maintainer approved the [A1 plan](a1-availability-search-plan.md) on
 2026-09-16, authorizing feature-branch creation and specification preparation
-first. Application implementation requires a separate explicit confirmation
-after document review; A1 remains Planned during this preparation stage.
+first. The maintainer subsequently authorized Domain unit 1, introduced
+RentalPeriod in fb72fc2, and explicitly authorized unit 2 and all following
+units. Implementation is verified on feature/availability-search and awaits merge.
 
 Agreed scope: GET /rooms/availability with start/end, minimum capacity, and
 page/pageSize. Return current room data, base hourly rate, and services, without
@@ -288,13 +289,25 @@ Completion criteria:
 - Tests cover adjacent intervals, unavailable rooms, tariff gaps, pagination,
   current offerings, and the search-to-booking conflict scenario.
 
+Verified on 2026-09-16: the read-only search filters and pages rooms in PostgreSQL,
+returns their current services in the same statement, and skips the room query
+when tariffs do not cover the period. Shared timestamp parsing preserves B1
+input rules. Real PostgreSQL/HTTP checks verify ordering, overlaps, query count,
+current offerings, safe failures, cancellation, and booking conflicts after
+search. All 290 tests passed on Windows (111 Domain, 45 Application, 122
+Integration, 12 AppHost), without skips. Restore, Release build with zero
+warnings/errors, EF model consistency, documentation/solution checks, and diff
+checks passed. See the [validation record](a1-availability-search-plan.md#8-implementation-and-validation-record).
+No hosted Linux CI run or merge is claimed; Q1 remains separate work.
+
 ### H1: Complete the five business API operations
 
 The booking operation, its HTTP contract/tests, and development Swagger UI are
-delivered with B1. R1's room creation, editing and deletion are locally verified,
-together with its approved supporting read. Four of the five core operations
-are verified; availability search remains A1. H1 will remain open until all five
-core operations are verified and the complete scope is merged.
+delivered with B1. R1 delivers room creation, editing and deletion, together with
+its approved supporting read. A1 adds availability search. All five core
+operations and their HTTP/OpenAPI contracts are verified by the complete test
+run recorded under A1 above. H1 remains Verified until A1 is merged and the
+complete scope can be marked Done.
 
 Completion criteria:
 
