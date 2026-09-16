@@ -41,6 +41,7 @@ The original requirements and project decisions are documented separately:
 - [Complete P1 persistence specification and implementation plan](docs/p1-persistence-specification.md).
 - [Approved B1 booking implementation plan and API contract](docs/b1-booking-implementation-plan.md).
 - [Approved R1 room management and concurrency contract](docs/r1-room-management-plan.md).
+- [Agreed A1 availability search specification; implementation awaiting confirmation](docs/a1-availability-search-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/p1-validation.md).
 

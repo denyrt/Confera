@@ -19,6 +19,7 @@
     <File Path=".github/workflows/ci.yml" />
   </Folder>
   <Folder Name="/docs/">
+    <File Path="docs/a1-availability-search-plan.md" />
     <File Path="docs/agent-workflow.md" />
     <File Path="docs/b1-booking-implementation-plan.md" />
     <File Path="docs/booking-and-pricing-rules.md" />

@@ -44,7 +44,7 @@ alongside their corresponding application use cases.
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
 | B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
 | R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](r1-room-management-plan.md#validation-record). |
-| A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
+| A1 | Availability search | Planned | [Specification and plan](a1-availability-search-plan.md) agreed on 2026-09-16; feature branch/documentation prepared. Full implementation awaits separate maintainer confirmation. |
 | H1 | Complete the five business API operations | In progress | Four core operations verified through B1 and R1, plus the supporting room GET; availability search remains A1. |
 | Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
 
@@ -258,6 +258,23 @@ final delivery. A1 and reports remain separate tasks.
 
 ### A1: Availability search
 
+The maintainer approved the [A1 plan](a1-availability-search-plan.md) on
+2026-09-16, authorizing feature-branch creation and specification preparation
+first. Application implementation requires a separate explicit confirmation
+after document review; A1 remains Planned during this preparation stage.
+
+Agreed scope: GET /rooms/availability with start/end, minimum capacity, and
+page/pageSize. Return current room data, base hourly rate, and services, without
+a period-price estimate. Pagination exposes items, page, pageSize, and
+hasNextPage, without totalCount; defaults are page 1 and pageSize 20, maximum
+100. Missing tariff coverage yields a successful empty result. Search does not
+reserve rooms and shares Domain period/tariff interpretation with booking.
+
+Preparation validation on 2026-09-16: Release build passed with zero
+warnings/errors; 80 local links/anchors, 36 solution paths, all 15 Markdown
+registrations, and diff checks passed. Runtime tests were not run for the
+documentation-only change; this is not A1 implementation acceptance evidence.
+
 Completion criteria:
 
 - Search applies active-room, capacity, overlap, and full tariff-coverage rules.
@@ -265,7 +282,11 @@ Completion criteria:
 - Queries avoid loading full booking histories or issuing a query per room.
 - Results include current service IDs, names, and prices so clients can select
   services when creating a booking.
-- Tests cover adjacent intervals, unavailable rooms, and tariff gaps.
+- Database pagination uses capacity/ID ordering and correct hasNextPage behavior
+  without a count query; room services do not consume page slots.
+- HTTP query validation, safe errors, and OpenAPI follow the agreed contract.
+- Tests cover adjacent intervals, unavailable rooms, tariff gaps, pagination,
+  current offerings, and the search-to-booking conflict scenario.
 
 ### H1: Complete the five business API operations
 
