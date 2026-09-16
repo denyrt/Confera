@@ -44,8 +44,8 @@ alongside their corresponding application use cases.
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
 | B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
 | R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](r1-room-management-plan.md#validation-record). |
-| A1 | Availability search | Verified | GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](a1-availability-search-plan.md#8-implementation-and-validation-record); implementation is unmerged. |
-| H1 | Complete the five business API operations | Verified | B1, R1, and A1 supply all five core operations, plus the supporting room GET. HTTP/OpenAPI and all 290 tests passed; A1 awaits merge. |
+| A1 | Availability search | Done | [PR #10](https://github.com/denyrt/Confera/pull/10), merged as `85988e8` on 2026-09-16 and confirmed on fetched origin/main. GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](a1-availability-search-plan.md#8-implementation-and-validation-record). |
+| H1 | Complete the five business API operations | Done | B1, R1, and A1 deliver all five core operations, plus the supporting room GET. A1's merge in PR #10 (`85988e8`) completes the operation set on main; HTTP/OpenAPI and all 290 tests passed. |
 | Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
 
 ### D1: Domain booking creation and tariff pricing
@@ -262,7 +262,8 @@ The maintainer approved the [A1 plan](a1-availability-search-plan.md) on
 2026-09-16, authorizing feature-branch creation and specification preparation
 first. The maintainer subsequently authorized Domain unit 1, introduced
 RentalPeriod in fb72fc2, and explicitly authorized unit 2 and all following
-units. Implementation is verified on feature/availability-search and awaits merge.
+units. Implementation was verified on feature/availability-search and is now
+merged into main through PR #10.
 
 Agreed scope: GET /rooms/availability with start/end, minimum capacity, and
 page/pageSize. Return current room data, base hourly rate, and services, without
@@ -298,7 +299,18 @@ search. All 290 tests passed on Windows (111 Domain, 45 Application, 122
 Integration, 12 AppHost), without skips. Restore, Release build with zero
 warnings/errors, EF model consistency, documentation/solution checks, and diff
 checks passed. See the [validation record](a1-availability-search-plan.md#8-implementation-and-validation-record).
-No hosted Linux CI run or merge is claimed; Q1 remains separate work.
+That pre-merge validation did not include a hosted Linux CI run; Q1 remains
+separate work.
+
+Completion recorded on 2026-09-16 at the maintainer's request: after
+`git fetch origin`, both local `main` and `origin/main` resolve to
+`85988e86749e20c42032d3b086163ecb80fb2d5d`, the squash merge of
+[PR #10](https://github.com/denyrt/Confera/pull/10). The saved TRX reports confirm
+all 290 local tests passed. Documentation links, solution paths, and diff checks
+passed for this status update; runtime tests were not rerun because application
+behavior did not change. Hosted Linux CI results were not verified in this
+update. The A1 plan preserves the pre-merge validation record; this roadmap
+records final delivery.
 
 ### H1: Complete the five business API operations
 
@@ -306,8 +318,8 @@ The booking operation, its HTTP contract/tests, and development Swagger UI are
 delivered with B1. R1 delivers room creation, editing and deletion, together with
 its approved supporting read. A1 adds availability search. All five core
 operations and their HTTP/OpenAPI contracts are verified by the complete test
-run recorded under A1 above. H1 remains Verified until A1 is merged and the
-complete scope can be marked Done.
+run recorded under A1 above. A1's confirmed merge in PR #10 completes delivery
+of the full operation set, so H1 is Done as of 2026-09-16. Reports remain Q1.
 
 Completion criteria:
 
