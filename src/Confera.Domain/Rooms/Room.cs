@@ -11,6 +11,7 @@ public sealed class Room
     public int Capacity { get; private set; }
     public decimal HourlyRate { get; private set; }
     public bool IsDeleted { get; private set; }
+    public Guid Version { get; private set; }
     public IReadOnlyCollection<RoomService> Services => _services.AsReadOnly();
 
     private Room()
@@ -24,36 +25,101 @@ public sealed class Room
         Name = DomainValidation.RequireText(name, 64, nameof(name));
         Capacity = DomainValidation.RequirePositive(capacity, nameof(capacity));
         HourlyRate = DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
+        Version = Guid.NewGuid();
+    }
+
+    public Room(RoomDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(details);
+        Id = Guid.CreateVersion7();
+        Name = details.Name;
+        Capacity = details.Capacity;
+        HourlyRate = details.HourlyRate;
+        Version = Guid.NewGuid();
+        ApplyServices(details.Services);
     }
 
     public void SetName(string name)
     {
-        Name = DomainValidation.RequireText(name, 64, nameof(name));
+        EnsureActive();
+        var validated = DomainValidation.RequireText(name, 64, nameof(name));
+        if (Name == validated)
+        {
+            return;
+        }
+
+        Name = validated;
+        Version = Guid.NewGuid();
     }
 
     public void SetCapacity(int capacity)
     {
-        Capacity = DomainValidation.RequirePositive(capacity, nameof(capacity));
+        EnsureActive();
+        var validated = DomainValidation.RequirePositive(capacity, nameof(capacity));
+        if (Capacity == validated)
+        {
+            return;
+        }
+
+        Capacity = validated;
+        Version = Guid.NewGuid();
     }
 
     public void SetHourlyRate(decimal hourlyRate)
     {
-        HourlyRate = DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
+        EnsureActive();
+        var validated = DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
+        if (HourlyRate == validated)
+        {
+            return;
+        }
+
+        HourlyRate = validated;
+        Version = Guid.NewGuid();
     }
 
     public void SetServices(IEnumerable<RoomServiceData> services)
     {
-        ArgumentNullException.ThrowIfNull(services);
+        EnsureActive();
+        if (ApplyServices(RoomDetails.ValidateServices(services)))
+        {
+            Version = Guid.NewGuid();
+        }
+    }
 
-        var validated = services
-            .Select(x => new RoomServiceData(
-                DomainValidation.RequireText(x.Name, 64, nameof(x.Name)),
-                DomainValidation.RequireServicePrice(x.Price, nameof(x.Price))))
-            .ToArray();
+    public void Update(RoomDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(details);
+        EnsureActive();
 
-        ThrowIfServiceNamesNotUnique(validated, nameof(services));
+        var servicesChanged = ApplyServices(details.Services);
+        if (!servicesChanged && Name == details.Name && Capacity == details.Capacity && HourlyRate == details.HourlyRate)
+        {
+            return;
+        }
 
-        var newServicesMap = validated.ToDictionary(x => NameIdentity.Key(x.Name), StringComparer.Ordinal);
+        Name = details.Name;
+        Capacity = details.Capacity;
+        HourlyRate = details.HourlyRate;
+        Version = Guid.NewGuid();
+    }
+
+    /// <summary>The caller checks unfinished bookings under the shared room lock.</summary>
+    public void Delete()
+    {
+        if (IsDeleted)
+        {
+            return;
+        }
+
+        IsDeleted = true;
+        Version = Guid.NewGuid();
+    }
+
+    private bool ApplyServices(IReadOnlyList<RoomServiceData> services)
+    {
+        var newServicesMap = services.ToDictionary(x => NameIdentity.Key(x.Name), StringComparer.Ordinal);
+        var changed = false;
 
         for (var i = _services.Count - 1; i >= 0; --i)
         {
@@ -61,11 +127,16 @@ public sealed class Room
 
             if (newServicesMap.Remove(NameIdentity.Key(existing.Name), out var incoming))
             {
-                existing.UpdatePrice(incoming.Price);
+                if (existing.Name != incoming.Name || existing.Price != incoming.Price)
+                {
+                    existing.Update(incoming.Name, incoming.Price);
+                    changed = true;
+                }
             }
             else
             {
                 _services.RemoveAt(i);
+                changed = true;
             }
         }
 
@@ -73,7 +144,10 @@ public sealed class Room
         foreach (var service in servicesToAdd)
         {
             _services.Add(service);
+            changed = true;
         }
+
+        return changed;
     }
 
     /// <summary>Creates a priced booking; availability and persistence are coordinated by the caller.</summary>
@@ -84,6 +158,7 @@ public sealed class Room
         IReadOnlyList<Guid> serviceIds,
         IReadOnlyList<BookingPricingRule> rules)
     {
+        EnsureActive();
         nowUtc = UtcPrecision.Floor(nowUtc);
         BookingValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
         BookingValidation.RequireServiceIds(serviceIds);
@@ -113,13 +188,11 @@ public sealed class Room
         }
     }
 
-    private static void ThrowIfServiceNamesNotUnique(IReadOnlyCollection<RoomServiceData> services, string parameterName)
+    private void EnsureActive()
     {
-        if (services
-            .GroupBy(x => NameIdentity.Key(x.Name), StringComparer.Ordinal)
-            .Any(group => group.Count() > 1))
+        if (IsDeleted)
         {
-            throw new ArgumentException("Service names must be unique within a room.", parameterName);
+            throw new InvalidOperationException("A deleted room cannot be changed or booked.");
         }
     }
 }

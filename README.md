@@ -6,8 +6,9 @@ The project covers conference room management, availability search, bookings, re
 
 ## Project status
 
-Transactional booking creation through `POST /bookings`, Domain pricing, and
-PostgreSQL persistence are implemented. Bookings
+Room creation, reading, replacement and soft deletion, transactional booking
+creation through `POST /bookings`, Domain pricing, and PostgreSQL persistence
+are implemented. Bookings
 preserve UTC microsecond instants, rounded tariff segments, selected services,
 and prices as historical snapshots. PostgreSQL enforces active room/service
 name integrity, globally unique tariff priorities, and concurrent booking
@@ -24,10 +25,12 @@ checks availability, and commits the complete booking atomically. It rejects
 absent/deleted rooms and returns stable HTTP errors. Development Swagger UI
 documents the operation and its price breakdown.
 
-Room creation/editing/deletion, availability search, and both reports remain
-planned. `Room.IsDeleted` and active-name uniqueness exist; deletion and its
-booking-dependent guards remain R1. The roadmap records delivery and validation
-status separately from implemented behavior.
+Room updates and deletion share booking's room-row lock. Capacity reduction and
+deletion reject ongoing/future bookings. GET returns an ETag; PUT and deletion
+of an active room require If-Match to prevent stale writes. Room/service changes
+rotate a UUID version; no-op replacements and bookings retain it. Availability
+search and both reports remain planned. The roadmap records validation and
+merge status separately from implemented behavior.
 
 The original requirements and project decisions are documented separately:
 
@@ -37,11 +40,13 @@ The original requirements and project decisions are documented separately:
 - [Implementation roadmap, task status, and completion criteria](docs/implementation-roadmap.md).
 - [Complete P1 persistence specification and implementation plan](docs/p1-persistence-specification.md).
 - [Approved B1 booking implementation plan and API contract](docs/b1-booking-implementation-plan.md).
+- [Approved R1 room management and concurrency contract](docs/r1-room-management-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/p1-validation.md).
 
 The agreed scope is the assignment's five core API operations plus two read-only
-reports. Booking and tariff times use UTC; bookings last 30 minutes to 24 hours
+reports and a supporting room-by-ID read for conditional editing. Booking and
+tariff times use UTC; bookings last 30 minutes to 24 hours
 with full tariff coverage. Confirmed prices and selected services are preserved
 as snapshots. The decision documents describe the target behavior, including
 rules that the current domain foundation does not yet enforce.
@@ -70,6 +75,15 @@ booking ID, UAH total, rental segments, and recorded services. For the original
 Room A data, 11:00-15:00 UTC with Projector and Wi-Fi costs 9,400 UAH.
 See the [booking example and ID lookup](docs/local-development.md#try-a-booking)
 and [HTTP request file](src/Confera.Api/Confera.Api.http).
+
+Room management uses `POST /rooms`, `GET /rooms/{id}`, `PUT /rooms/{id}` and
+`DELETE /rooms/{id}`. POST returns 201 and Location; GET returns current data,
+service IDs and ETag. Copy ETag into If-Match for PUT/DELETE. Missing conditions
+return 428, stale versions 412, and business conflicts 409. PUT requires all
+fields and the complete services array; `[]` removes all current services.
+It returns 200 with current data; GET supplies the next ETag. Repeated deletion
+returns 204, including an old or absent condition. See the
+[room editing example](docs/local-development.md#manage-rooms-with-etag).
 
 Overlaps return `409`; adjacent bookings are allowed. Booking writes have no
 automatic retries or idempotency keys. A lost response may follow a successful

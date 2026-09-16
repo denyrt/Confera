@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Confera.Application.Bookings;
+using Confera.Application.Rooms;
 using Confera.Domain.Rooms;
 using Confera.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -266,7 +267,7 @@ public sealed class BookingHttpTests(PostgresFixture postgres)
         ["serviceIds"] = JsonSerializer.SerializeToNode(room.Services.Select(x => x.Id).ToArray())
     };
 
-    private static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code)
+    internal static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code)
     {
         Assert.Equal(status, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -324,6 +325,7 @@ internal sealed class BookingApiFactory(TestDatabase database, params IIntercept
             if (interceptors.Length > 0)
             {
                 services.AddScoped<IBookingStore>(_ => new BookingStore(new BookingContextFactory(database, interceptors)));
+                services.AddScoped<IRoomStore>(_ => new RoomStore(new BookingContextFactory(database, interceptors)));
             }
         });
     }

@@ -68,7 +68,7 @@ public sealed class PersistenceContractTests
         var id = room.Services.Single().Id;
         room.SetServices([new("\u00a0ЇЄҐ\u2009", 500m)]);
         Assert.Equal(id, room.Services.Single().Id);
-        Assert.Equal("їєґ", room.Services.Single().Name);
+        Assert.Equal("ЇЄҐ", room.Services.Single().Name);
         Assert.Throws<ArgumentException>(() => room.SetServices([new("ЇЄҐ", 600m), new(" їєґ ", 700m)]));
         Assert.Equal(500m, room.Services.Single().Price);
         Assert.NotEqual(NameIdentity.Key("A"), NameIdentity.Key("А"));

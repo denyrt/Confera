@@ -27,6 +27,7 @@
     <File Path="docs/local-development.md" />
     <File Path="docs/p1-persistence-specification.md" />
     <File Path="docs/p1-validation.md" />
+    <File Path="docs/r1-room-management-plan.md" />
     <File Path="docs/task-specification.md" />
     <File Path="docs/task-specification.uk.md" />
   </Folder>

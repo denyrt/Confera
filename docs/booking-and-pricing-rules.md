@@ -71,10 +71,10 @@ existing exclusion constraint is the final overlap guard, and its specific
 violation maps to the same conflict as the preliminary availability check.
 The room lock briefly serializes same-room writes, including disjoint periods.
 
-R1 must acquire this same room lock before reading, validating, or changing a
+R1 acquires this same room lock before reading, validating, or changing a
 room, its service collection, or its deleted state. The lock protocol applies
 to supported application operations; arbitrary SQL child edits do not
-automatically obey it. B1 does not implement R1's lifecycle operations.
+automatically obey it. R1 supplies the lifecycle operations separately from B1.
 
 The tariff set used for pricing is the set read during this transaction;
 there is no extra guarantee of the latest tariff at commit time and no global
@@ -175,6 +175,14 @@ services must still be provided under their recorded names and prices. Service
 snapshots do not reference the current `RoomService` ID, so removed offerings can
 be physically deleted without removing booking history.
 
+R1 replaces the entire current service set. Matching uses the normalized name
+key: a match retains its ID and updates display spelling/price; a different key
+creates a new ID. Thus projector -> Projector retains identity, while Projector
+-> Presentation equipment replaces the offering. Omitted services are removed;
+an empty array removes all. Old IDs from removed/renamed offerings are invalid
+for new bookings. This explicitly updates P1's original behavior that retained
+the old display spelling for a matching key.
+
 Room capacity may be increased. Decreasing it is rejected while any booking has
 an end later than the current UTC time, including an ongoing booking. Bookings
 do not record attendance, so there is no reliable way to prove that a lower
@@ -204,12 +212,31 @@ A deleted room's name may be reused by a new room with a different ID. Reports
 identify and group rooms by ID rather than merging rooms with the same name.
 Soft-delete is required for rooms; it is not a blanket policy for every model.
 
+### Conditional room editing
+
+GET /rooms/{id} returns active room data, services, and a strong ETag. Full PUT
+and deletion of an active room require explicit If-Match tags: missing header
+returns 428, unmatched version 412, malformed or wildcard header 400. Matching
+uses strong comparison; lists are accepted and weak tags do not match.
+
+Room.Version changes for actual room/service/deletion changes, not equivalent
+replacements or bookings. Validate lifecycle and version under the shared room
+lock; a stale caller cannot overwrite newer state. GET reads the entire current
+representation and version together; it does not reserve the room. PUT returns
+current data without ETag because input is transformed; GET obtains the next
+validator. No automatic merge or write replay is performed.
+
+An absent room returns 404. Read/update of a deleted room returns 404; a repeated
+DELETE returns 204 even with an old or missing condition, retaining its services
+and booking history. There is no restore endpoint. The
+[R1 contract](r1-room-management-plan.md) records the complete protocol.
+
 ## Persistence and initial data
 
 [P1's complete specification](p1-persistence-specification.md) defines the
 initial schema, MigrationWorker, `postgres:18.6`, test isolation, and acceptance
-checks. P1 includes `Room.IsDeleted` and active-name uniqueness; room lifecycle
-operations and booking-dependent restrictions remain R1.
+checks. P1 includes `Room.IsDeleted` and active-name uniqueness; R1 adds room
+lifecycle operations, booking-dependent restrictions and the UUID version migration.
 
 Demo data is initialized outside schema migrations, explicitly by local
 AppHost's worker. Seed and a completion marker are committed once, atomically,
