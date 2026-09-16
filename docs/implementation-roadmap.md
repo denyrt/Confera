@@ -43,7 +43,7 @@ alongside their corresponding application use cases.
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
 | P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
 | B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
-| R1 | Room management and lifecycle restrictions | Verified | Local, unmerged implementation: room API, full replacement, lifecycle guards and ETag/If-Match, including GET /rooms/{id}. Release build and all 225 tests passed on Windows, 2026-09-16; [plan and evidence](r1-room-management-plan.md#validation-record). |
+| R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](r1-room-management-plan.md#validation-record). |
 | A1 | Availability search | Planned | Depends on P1; reuses domain period and tariff validation. |
 | H1 | Complete the five business API operations | In progress | Four core operations verified through B1 and R1, plus the supporting room GET; availability search remains A1. |
 | Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
@@ -246,8 +246,15 @@ tests passed on Windows (101 Domain, 27 Application, 85 Integration, 12 AppHost)
 without skips. Restore, Release build with zero warnings/errors, EF model check,
 71 local documentation links/anchors, 35 solution paths, document registration
 and diff checks passed. See the [validation record](r1-room-management-plan.md#validation-record).
-Implementation is local on feature/room-management and unmerged; no hosted Linux
-CI run or publication is claimed. A1 and reports remain separate tasks.
+
+Completion recorded on 2026-09-16 at the maintainer's request: after
+`git fetch origin`, both local `main` and `origin/main` resolve to
+`5ce2eb606a8d933e524068682e140e4f60b46aa6`, the squash merge of
+[PR #9](https://github.com/denyrt/Confera/pull/9). The validation record above
+documents the 225 passing local tests; application behavior did not change in
+this status update. Hosted Linux CI results were not verified in this update.
+The R1 plan preserves the pre-merge validation record; this roadmap records
+final delivery. A1 and reports remain separate tasks.
 
 ### A1: Availability search
 
