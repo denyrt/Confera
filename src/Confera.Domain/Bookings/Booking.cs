@@ -33,7 +33,7 @@ public sealed class Booking
         ArgumentNullException.ThrowIfNull(services, nameof(services));
         ArgumentNullException.ThrowIfNull(priceSegments, nameof(priceSegments));
 
-        BookingValidation.RequireBookingPeriod(startsAtUtc, endsAtUtc, nowUtc);
+        BookingValidation.RequireBookingPeriod(RentalPeriod.Create(startsAtUtc, endsAtUtc), nowUtc);
         RequireContinuousCoverage(priceSegments, startsAtUtc, endsAtUtc);
         RequireMatchingHourlyRate(priceSegments, hourlyRateSnapshot);
 

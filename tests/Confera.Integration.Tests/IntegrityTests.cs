@@ -20,10 +20,11 @@ public sealed class IntegrityTests(PostgresFixture postgres)
             var room = new Room("Room", 1, 1000.001m);
             room.SetServices([new("Service", 200.001m)]);
             var start = new DateTime(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc);
+            var period = RentalPeriod.Create(start, start.AddMinutes(30));
             var rule = new BookingPricingRule("Day", "Day", new TimeOnly(9, 0), new TimeOnly(18, 0), 1m, 0);
             db.Add(room);
             db.Add(rule);
-            db.Add(room.Book(start, start.AddMinutes(30), start, room.Services.Select(x => x.Id).ToArray(), [rule]));
+            db.Add(room.Book(period, start, room.Services.Select(x => x.Id).ToArray(), [rule]));
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
@@ -178,7 +179,7 @@ public sealed class IntegrityTests(PostgresFixture postgres)
             loaded.SetServices([new("Service", 200m)]);
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             var rule = new BookingPricingRule("Day", "Day", new TimeOnly(9, 0), new TimeOnly(18, 0), 1m, 0);
-            var conflict = loaded.Book(end.AddMinutes(-30), end.AddMinutes(30), end.AddHours(-2), loaded.Services.Select(x => x.Id).ToArray(), [rule]);
+            var conflict = loaded.Book(RentalPeriod.Create(end.AddMinutes(-30), end.AddMinutes(30)), end.AddHours(-2), loaded.Services.Select(x => x.Id).ToArray(), [rule]);
             db.Add(conflict);
             var error = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync(TestContext.Current.CancellationToken));
             Assert.Equal(PostgresErrorCodes.ExclusionViolation, ((PostgresException)error.InnerException!).SqlState);

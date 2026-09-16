@@ -4,28 +4,23 @@ public static class BookingPriceCalculator
 {
     /// <summary>Checks full tariff coverage without calculating a rental price.</summary>
     /// <remarks>Invalid periods and rule configurations throw; missing coverage returns false.</remarks>
-    public static bool HasFullCoverage(
-        DateTime startsAtUtc,
-        DateTime endsAtUtc,
-        IReadOnlyList<BookingPricingRule> rules)
+    public static bool HasFullCoverage(RentalPeriod period, IReadOnlyList<BookingPricingRule> rules)
     {
-        BookingValidation.RequireRentalPeriod(startsAtUtc, endsAtUtc);
         BookingPricingRule.ValidateSet(rules);
 
-        return GetCoveredSegments(startsAtUtc, endsAtUtc, rules) is not null;
+        return GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules) is not null;
     }
 
     public static IReadOnlyList<BookingRentalSegment> Calculate(
-        DateTime startsAtUtc,
-        DateTime endsAtUtc,
+        RentalPeriod period,
         decimal hourlyRate,
         IReadOnlyList<BookingPricingRule> rules)
     {
-        BookingValidation.RequireRentalPeriod(startsAtUtc, endsAtUtc);
+        ArgumentNullException.ThrowIfNull(period, nameof(period));
         DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
         BookingPricingRule.ValidateSet(rules);
 
-        var coveredSegments = GetCoveredSegments(startsAtUtc, endsAtUtc, rules)
+        var coveredSegments = GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules)
             ?? throw new BookingValidationException(BookingValidationError.MissingTariffCoverage,
                 "The entire booking period must be covered by pricing rules.");
         var segments = new List<BookingRentalSegment>();

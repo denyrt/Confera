@@ -21,7 +21,8 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
             throw new BookingOperationException(BookingFailure.InvalidRequest);
         }
 
-        BookingValidation.RequireRentalPeriod(command.StartsAtUtc, command.EndsAtUtc);
+        var rentalPeriod = RentalPeriod.Create(command.StartsAtUtc, command.EndsAtUtc);
+
         BookingValidation.RequireServiceIds(command.ServiceIds);
         // Capture caller-owned input before the first asynchronous boundary.
         var serviceIds = command.ServiceIds.ToArray();
@@ -35,14 +36,15 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
 
         var rules = await transaction.GetPricingRulesAsync(cancellationToken);
         var nowUtc = UtcPrecision.Floor(timeProvider.GetUtcNow().UtcDateTime);
-        BookingValidation.RequireBookingPeriod(command.StartsAtUtc, command.EndsAtUtc, nowUtc);
+
+        BookingValidation.RequireBookingPeriod(rentalPeriod, nowUtc);
 
         if (await transaction.HasOverlapAsync(room.Id, command.StartsAtUtc, command.EndsAtUtc, cancellationToken))
         {
             throw new BookingOperationException(BookingFailure.RoomUnavailable);
         }
 
-        var booking = room.Book(command.StartsAtUtc, command.EndsAtUtc, nowUtc, serviceIds, rules);
+        var booking = room.Book(rentalPeriod, nowUtc, serviceIds, rules);
         // Prepare the response before writing; success is still returned only after commit.
         var result = BookingResult.FromBooking(booking);
         await transaction.SaveAsync(booking, cancellationToken);

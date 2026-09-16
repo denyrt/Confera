@@ -7,6 +7,8 @@ internal static class BookingTestData
     public static DateTime At(int hour, int minute = 0, int second = 0) =>
         new(2026, 9, 15, hour, minute, second, DateTimeKind.Utc);
 
+    public static RentalPeriod Period(DateTime startsAtUtc, DateTime endsAtUtc) => RentalPeriod.Create(startsAtUtc, endsAtUtc);
+
     public static BookingPricingRule Rule(
         string code, int startHour, int endHour, decimal multiplier = 1m, int? priority = null) =>
         new(code, code, new TimeOnly(startHour, 0), new TimeOnly(endHour, 0), multiplier, priority ?? startHour);
