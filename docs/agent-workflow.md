@@ -129,9 +129,11 @@ exception for a final status update directly on `main`. Do not assume this updat
 will happen automatically. Include any pending update after merge in the handoff
 to the user or the assigned agent.
 
-Register every new documentation file in Confera.slnx using its actual relative
-path under the corresponding solution folder, such as `/docs/`. Register root
-agent instructions under `/Solution Items/`.
+Keep task-specific plans, specifications, and their supporting validation records
+in `docs/plans/`; shared rules, the roadmap, and development guidance stay in
+`docs/`. Register every new documentation file in Confera.slnx using its actual
+relative path under the matching solution folder, such as `/docs/plans/`.
+Register root agent instructions under `/Solution Items/`.
 
 Finish with the result, the reason for material changes, actual validation, and
 remaining limitations relevant to the task. Do not claim unimplemented or

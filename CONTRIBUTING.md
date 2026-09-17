@@ -142,7 +142,7 @@ resources. Normal integration tests migrate a unique empty database per test;
 seed scenarios opt in. Resource Reaper remains enabled.
 
 Add `--report-trx --results-directory artifacts/tests/<suite>` for TRX reports.
-The [P1 validation record](docs/p1-validation.md) contains actual commands and
+The [P1 validation record](docs/plans/p1-validation.md) contains actual commands and
 results. The GitHub Actions workflow restores/builds Release and invokes each
 implemented suite; failures remain failures. Test output and safe resource-state
 diagnostics are ignored locally and archived in CI.

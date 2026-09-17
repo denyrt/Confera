@@ -92,7 +92,7 @@ Version preconditions prevent stale changes; the EF mapping also uses Version
 as a concurrency token. GET reads current room/services/version in one statement.
 History checks belong to Application/Infrastructure, not a Room.Bookings collection.
 
-The [P1 implementation](p1-persistence-specification.md) includes minimal
+The [P1 implementation](plans/p1-persistence-specification.md) includes minimal
 `Room.IsDeleted` state, normalized active-room/service name integrity, inclusive
 rate/service/multiplier bounds, microsecond time precision, unique priorities,
 EF mappings/migrations, MigrationWorker and isolated real-database tests.
@@ -121,18 +121,18 @@ timestamps rather than the assignment's start and duration; both describe the
 same interval.
 
 The booking operation is implemented under B1. Its
-[approved plan](b1-booking-implementation-plan.md#5-http-contract) records the
+[approved plan](plans/b1-booking-implementation-plan.md#5-http-contract) records the
 request, response, and error codes. A1 exposes GET /rooms/availability through
 SearchAvailabilityService with start/end, minimum capacity, and page/pageSize.
 It returns current room data and service IDs/names/prices for a subsequent booking.
 The result includes hasNextPage, without a total count or period-price estimate.
 It reads tariffs once, then eligible rooms and services in one paginated query;
-missing coverage returns an empty page. See the [A1 contract](a1-availability-search-plan.md).
+missing coverage returns an empty page. See the [A1 contract](plans/a1-availability-search-plan.md).
 
 R1 exposes room creation, full replacement, soft deletion and room-by-ID reading.
 PUT and deletion of an active room require If-Match; stale versions return 412
 and missing conditions 428. Repeated deletion returns 204 even with an old or
-missing version. See the [R1 contract](r1-room-management-plan.md) for complete
+missing version. See the [R1 contract](plans/r1-room-management-plan.md) for complete
 request, precondition, response and failure semantics.
 
 Separate public endpoints for price quotes, booking retrieval, cancellation,
@@ -187,6 +187,14 @@ than promising its name at booking time.
 Service popularity groups by the name in each booking snapshot across rooms.
 A renamed service appears under its old or new name according to the snapshot;
 there is no stable cross-room catalog identity for merging renamed services.
+
+The approved [Q1 plan](plans/q1-reports-plan.md) specifies exact, case-sensitive
+snapshot-name grouping, so Projector and projector remain separate. Room rows
+exist only for rooms with selected bookings. Both reports return all groups
+without pagination, and total booked duration is decimal seconds preserving
+microsecond precision. These are approved target contracts, not delivery claims.
+The plan records alternative designs as optional future work requiring a new
+decision, not unfinished Q1 requirements.
 
 Occupancy percentages are deferred: a reliable denominator would require a
 policy for available hours over time, including changes to tariff coverage.

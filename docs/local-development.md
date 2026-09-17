@@ -105,7 +105,7 @@ hasNextPage false. For explicit positive offsets, encode + as %2B in the URL.
 
 Search does not reserve rooms. Availability and current rates/services may change
 before booking or between page requests; POST /bookings validates again. Search
-uses Cache-Control: no-store. Its [contract](a1-availability-search-plan.md)
+uses Cache-Control: no-store. Its [contract](plans/a1-availability-search-plan.md)
 describes timestamp limits, errors, and read consistency.
 
 Use a future, available date; replace the example identifiers with actual IDs.
@@ -134,7 +134,7 @@ and traceId. Invalid requests/periods/services or uncovered tariff hours return
 400, absent/deleted rooms return 404, and overlaps return 409. Recognized
 temporary database failures/timeouts return 503; unexpected failures return
 500 without internal details. The
-[B1 contract](b1-booking-implementation-plan.md#errors) lists the stable codes.
+[B1 contract](plans/b1-booking-implementation-plan.md#errors) lists the stable codes.
 
 Booking writes do not automatically retry and do not support idempotency keys.
 A failed/lost response may follow a successful commit. Repeating a successful
@@ -169,7 +169,7 @@ accepted; weak tags never match and wildcard * is rejected.
 
 GET responses use Cache-Control: no-store. No room restoration or automatic
 write replay is implemented. A lost response can follow a committed change.
-The [R1 contract](r1-room-management-plan.md) lists the stable ProblemDetails codes.
+The [R1 contract](plans/r1-room-management-plan.md) lists the stable ProblemDetails codes.
 
 ## Worker and demo initialization
 

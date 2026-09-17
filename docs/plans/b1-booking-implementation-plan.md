@@ -2,13 +2,13 @@
 
 Approved for implementation by the maintainer on 2026-09-16. This document
 preserves the complete agreed execution plan in English. Implementation status
-belongs in the [roadmap](implementation-roadmap.md); actual validation evidence
+belongs in the [roadmap](../implementation-roadmap.md); actual validation evidence
 is appended below. Approval of this plan alone is not evidence of delivery.
 
-Read alongside [CONTRIBUTING](../CONTRIBUTING.md), the
-[agent workflow](agent-workflow.md), [domain model](domain-model.md), and
-[booking and pricing rules](booking-and-pricing-rules.md). The original
-[technical assignment](task-specification.md) remains unchanged.
+Read alongside [CONTRIBUTING](../../CONTRIBUTING.md), the
+[agent workflow](../agent-workflow.md), [domain model](../domain-model.md), and
+[booking and pricing rules](../booking-and-pricing-rules.md). The original
+[technical assignment](../task-specification.md) remains unchanged.
 
 ## 1. Outcome and scope
 

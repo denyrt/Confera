@@ -6,12 +6,12 @@ accepted this delivery exception; see the roadmap for its record. The acceptance
 contract and historical approved implementation plan below remain unchanged.
 Prepared and approved for implementation on 2026-09-15. This document is the
 complete acceptance contract for P1. See the [validation record](p1-validation.md)
-and [roadmap](implementation-roadmap.md) for actual implementation evidence.
+and [roadmap](../implementation-roadmap.md) for actual implementation evidence.
 
-Read this with [repository conventions](../CONTRIBUTING.md), the
-[agent workflow](agent-workflow.md), [domain model](domain-model.md),
-[business decisions](booking-and-pricing-rules.md), and
-[roadmap](implementation-roadmap.md). Preserve the original technical assignment.
+Read this with [repository conventions](../../CONTRIBUTING.md), the
+[agent workflow](../agent-workflow.md), [domain model](../domain-model.md),
+[business decisions](../booking-and-pricing-rules.md), and
+[roadmap](../implementation-roadmap.md). Preserve the original technical assignment.
 
 ## Outcome and scope
 

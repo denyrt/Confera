@@ -39,12 +39,13 @@ The original requirements and project decisions are documented separately:
 - [Domain model, API scope, initial data, and reports](docs/domain-model.md).
 - [Booking, pricing, room changes, and deletion rules](docs/booking-and-pricing-rules.md).
 - [Implementation roadmap, task status, and completion criteria](docs/implementation-roadmap.md).
-- [Complete P1 persistence specification and implementation plan](docs/p1-persistence-specification.md).
-- [Approved B1 booking implementation plan and API contract](docs/b1-booking-implementation-plan.md).
-- [Approved R1 room management and concurrency contract](docs/r1-room-management-plan.md).
-- [A1 availability search contract, implementation plan, and validation](docs/a1-availability-search-plan.md).
+- [Complete P1 persistence specification and implementation plan](docs/plans/p1-persistence-specification.md).
+- [Approved B1 booking implementation plan and API contract](docs/plans/b1-booking-implementation-plan.md).
+- [Approved R1 room management and concurrency contract](docs/plans/r1-room-management-plan.md).
+- [A1 availability search contract, implementation plan, and validation](docs/plans/a1-availability-search-plan.md).
+- [Approved Q1 reports contract and implementation plan](docs/plans/q1-reports-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
-- [P1 acceptance evidence](docs/p1-validation.md).
+- [P1 acceptance evidence](docs/plans/p1-validation.md).
 
 The agreed scope is the assignment's five core API operations plus two read-only
 reports and a supporting room-by-ID read for conditional editing. Booking and
