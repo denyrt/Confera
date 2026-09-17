@@ -30,6 +30,17 @@ Accept: application/json
 GET {{Confera.Api_HostAddress}}/openapi/v1.json
 Accept: application/json
 
+### Report complete bookings starting in this UTC month, including deleted-room history.
+# For the single Room A booking above: count 1, 14400 seconds, 8600 rental + 800 services = 9400 UAH.
+# Reports return all groups without pagination; empty results return 200 with items: [].
+GET {{Confera.Api_HostAddress}}/reports/rooms?start=2030-01-01T00:00:00Z&end=2030-02-01T00:00:00Z
+Accept: application/json
+
+### Service selection counts and recorded values, grouped by exact case-sensitive snapshot name.
+# For the booking above: Projector count 1 / 500 UAH; Wi-Fi count 1 / 300 UAH.
+GET {{Confera.Api_HostAddress}}/reports/services?start=2030-01-01T00:00:00Z&end=2030-02-01T00:00:00Z
+Accept: application/json
+
 ### Create a room. Copy its id (or Location) into roomId above.
 
 POST {{Confera.Api_HostAddress}}/rooms

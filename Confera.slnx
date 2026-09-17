@@ -19,18 +19,21 @@
     <File Path=".github/workflows/ci.yml" />
   </Folder>
   <Folder Name="/docs/">
-    <File Path="docs/a1-availability-search-plan.md" />
     <File Path="docs/agent-workflow.md" />
-    <File Path="docs/b1-booking-implementation-plan.md" />
     <File Path="docs/booking-and-pricing-rules.md" />
     <File Path="docs/domain-model.md" />
     <File Path="docs/implementation-roadmap.md" />
     <File Path="docs/local-development.md" />
-    <File Path="docs/p1-persistence-specification.md" />
-    <File Path="docs/p1-validation.md" />
-    <File Path="docs/r1-room-management-plan.md" />
     <File Path="docs/task-specification.md" />
     <File Path="docs/task-specification.uk.md" />
+  </Folder>
+  <Folder Name="/docs/plans/">
+    <File Path="docs/plans/a1-availability-search-plan.md" />
+    <File Path="docs/plans/b1-booking-implementation-plan.md" />
+    <File Path="docs/plans/p1-persistence-specification.md" />
+    <File Path="docs/plans/p1-validation.md" />
+    <File Path="docs/plans/q1-reports-plan.md" />
+    <File Path="docs/plans/r1-room-management-plan.md" />
   </Folder>
   <Folder Name="/orchestration/">
     <Project Path="orchestration/Confera.AppHost/Confera.AppHost.csproj" Id="a04f6849-ee0f-430f-8664-1020c1d969d3" />

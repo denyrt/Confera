@@ -1,5 +1,6 @@
 using Confera.Application.Availability;
 using Confera.Application.Bookings;
+using Confera.Application.Reports;
 using Confera.Application.Rooms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -41,6 +42,7 @@ public static class PersistenceConfiguration
         services.AddScoped<IBookingStore, BookingStore>();
         services.AddScoped<IRoomStore, RoomStore>();
         services.AddScoped<IAvailabilityReader, AvailabilityReader>();
+        services.AddScoped<IReportReader, ReportReader>();
         return services;
     }
 

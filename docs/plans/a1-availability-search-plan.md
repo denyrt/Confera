@@ -7,12 +7,12 @@ unit 2 and subsequent units, including implementation, verification, and
 documentation. The earlier approval gate has been satisfied.
 
 This document records the agreed contract in English, following the B1/R1 plans.
-Delivery status belongs in the [roadmap](implementation-roadmap.md); actual
+Delivery status belongs in the [roadmap](../implementation-roadmap.md); actual
 validation evidence belongs in the record below. Read alongside
-[CONTRIBUTING](../CONTRIBUTING.md), the [agent workflow](agent-workflow.md),
-[domain model](domain-model.md), and
-[booking and pricing rules](booking-and-pricing-rules.md). Preserve the original
-[technical assignment](task-specification.md).
+[CONTRIBUTING](../../CONTRIBUTING.md), the [agent workflow](../agent-workflow.md),
+[domain model](../domain-model.md), and
+[booking and pricing rules](../booking-and-pricing-rules.md). Preserve the original
+[technical assignment](../task-specification.md).
 
 ## 1. Outcome and scope
 

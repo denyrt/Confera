@@ -5,7 +5,8 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
-This section describes D1, P1 persistence, B1 booking, R1 room management, and A1 search.
+This section describes the Domain foundation used by persistence, booking,
+room management, availability search, and reports.
 
 | Model | Responsibility |
 | --- | --- |
@@ -62,11 +63,12 @@ not hold booking history. Creating a booking does not load or append to a room's
 history. Availability checks and saving the returned booking belong to the
 application and infrastructure layers.
 
-## Intended behavior and remaining work
+## Application behavior and persistence
 
 Snapshots keep confirmed booking prices independent of later changes to room
 rates, services, or pricing rules. Domain and real PostgreSQL round-trip tests
-verify this behavior. Reporting over snapshots remains Q1.
+verify this behavior. Q1 reports aggregate these snapshots in PostgreSQL without
+recalculating prices or loading booking histories into Domain aggregates.
 
 CreateBookingService coordinates booking validation, availability, and persistence.
 Infrastructure enforces a PostgreSQL exclusion constraint on room ID and the
@@ -92,7 +94,7 @@ Version preconditions prevent stale changes; the EF mapping also uses Version
 as a concurrency token. GET reads current room/services/version in one statement.
 History checks belong to Application/Infrastructure, not a Room.Bookings collection.
 
-The [P1 implementation](p1-persistence-specification.md) includes minimal
+The [P1 implementation](plans/p1-persistence-specification.md) includes minimal
 `Room.IsDeleted` state, normalized active-room/service name integrity, inclusive
 rate/service/multiplier bounds, microsecond time precision, unique priorities,
 EF mappings/migrations, MigrationWorker and isolated real-database tests.
@@ -113,26 +115,26 @@ by the database and compared with the `C` collation.
 
 ## API and application scope
 
-Expose the assignment's five operations: create, edit, and delete a room; search
-availability; and create a booking with its calculated price. Add two read-only
-report endpoints as described below. R1 also includes GET /rooms/{id}, explicitly
+The API exposes the assignment's five operations: create, edit, and delete a room;
+search availability; and create a booking with its calculated price. Q1 adds two
+read-only report endpoints as described below. R1 also includes GET /rooms/{id}, explicitly
 approved to obtain room state and ETag for conditional editing. The booking request uses start and end
 timestamps rather than the assignment's start and duration; both describe the
 same interval.
 
 The booking operation is implemented under B1. Its
-[approved plan](b1-booking-implementation-plan.md#5-http-contract) records the
+[approved plan](plans/b1-booking-implementation-plan.md#5-http-contract) records the
 request, response, and error codes. A1 exposes GET /rooms/availability through
 SearchAvailabilityService with start/end, minimum capacity, and page/pageSize.
 It returns current room data and service IDs/names/prices for a subsequent booking.
 The result includes hasNextPage, without a total count or period-price estimate.
 It reads tariffs once, then eligible rooms and services in one paginated query;
-missing coverage returns an empty page. See the [A1 contract](a1-availability-search-plan.md).
+missing coverage returns an empty page. See the [A1 contract](plans/a1-availability-search-plan.md).
 
 R1 exposes room creation, full replacement, soft deletion and room-by-ID reading.
 PUT and deletion of an active room require If-Match; stale versions return 412
 and missing conditions 428. Repeated deletion returns 204 even with an old or
-missing version. See the [R1 contract](r1-room-management-plan.md) for complete
+missing version. See the [R1 contract](plans/r1-room-management-plan.md) for complete
 request, precondition, response and failure semantics.
 
 Separate public endpoints for price quotes, booking retrieval, cancellation,
@@ -187,6 +189,20 @@ than promising its name at booking time.
 Service popularity groups by the name in each booking snapshot across rooms.
 A renamed service appears under its old or new name according to the snapshot;
 there is no stable cross-room catalog identity for merging renamed services.
+
+The approved [Q1 plan](plans/q1-reports-plan.md) specifies exact, case-sensitive
+snapshot-name grouping, so Projector and projector remain separate. Room rows
+exist only for rooms with selected bookings. Both reports return all groups
+without pagination, and total booked duration is decimal seconds preserving
+microsecond precision. GET /reports/rooms and GET /reports/services each use one
+parameterized aggregate statement without write locks or an explicit transaction.
+Room values order descending, with room ID as the tie-breaker; service counts
+order descending, followed by exact name using PostgreSQL C collation. The
+Application reporting period requires ordered UTC microsecond instants, without
+booking duration or past-start restrictions. Separate requests can observe
+different committed states. See the roadmap for validation and merge status.
+The plan records alternative designs as optional future work requiring a new
+decision, not unfinished Q1 requirements.
 
 Occupancy percentages are deferred: a reliable denominator would require a
 policy for available hours over time, including changes to tariff coverage.

@@ -41,12 +41,12 @@ alongside their corresponding application use cases.
 | --- | --- | --- | --- |
 | D1 | Domain booking creation and tariff pricing | Done | [PR #4](https://github.com/denyrt/Confera/pull/4), merged as `9539c15` on 2026-09-14; Release build without warnings and 70 passing domain tests recorded during review. |
 | W1 | Implementation roadmap and shared maintenance process | Done | [PR #5](https://github.com/denyrt/Confera/pull/5), merged as `c5c031e` on 2026-09-15; Release build, documentation links, solution items, and diff checks passed. |
-| P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](p1-validation.md). |
-| B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
-| R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](r1-room-management-plan.md#validation-record). |
-| A1 | Availability search | Done | [PR #10](https://github.com/denyrt/Confera/pull/10), merged as `85988e8` on 2026-09-16 and confirmed on fetched origin/main. GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](a1-availability-search-plan.md#8-implementation-and-validation-record). |
+| P1 | PostgreSQL persistence and infrastructure foundation | Done | Commit [`8875883`](https://github.com/denyrt/Confera/commit/8875883c69162bbf9c9ac7c304e2a3591dc05a8f) confirmed on fetched `origin/main`, 2026-09-15; direct push without PR, accepted by the maintainer. Full Windows/Linux acceptance matrix passed, with subsequent NameIdentity regressions recorded in [commands and evidence](plans/p1-validation.md). |
+| B1 | Transactional booking application use case | Done | [PR #8](https://github.com/denyrt/Confera/pull/8), merged as `1e6b96e` on 2026-09-16 and confirmed on fetched origin/main. POST /bookings, HTTP tests, and Swagger UI; Release build and all 167 tests passed. [Plan and validation evidence](plans/b1-booking-implementation-plan.md#9-implementation-and-validation-record). |
+| R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](plans/r1-room-management-plan.md#validation-record). |
+| A1 | Availability search | Done | [PR #10](https://github.com/denyrt/Confera/pull/10), merged as `85988e8` on 2026-09-16 and confirmed on fetched origin/main. GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](plans/a1-availability-search-plan.md#8-implementation-and-validation-record). |
 | H1 | Complete the five business API operations | Done | B1, R1, and A1 deliver all five core operations, plus the supporting room GET. A1's merge in PR #10 (`85988e8`) completes the operation set on main; HTTP/OpenAPI and all 290 tests passed. |
-| Q1 | Reports and assignment completion | Planned | Depends on persistence and completed business operations. |
+| Q1 | Reports and assignment completion | Verified | Both reports, snapshot aggregates, HTTP/OpenAPI, real-seed assignment path, and documentation delivered locally on feature/booking-reports, 2026-09-17. Release build and all 320 tests passed; unmerged. [Plan and evidence](plans/q1-reports-plan.md#9-implementation-and-validation-record). |
 
 ### D1: Domain booking creation and tariff pricing
 
@@ -109,7 +109,7 @@ Completion criteria:
   preserves test results and failure diagnostics.
 - Local startup and test commands are documented and verified.
 
-The [P1 specification](p1-persistence-specification.md) is the detailed acceptance
+The [P1 specification](plans/p1-persistence-specification.md) is the detailed acceptance
 contract and ordered implementation plan. It includes required Domain updates,
 SQL integrity/concurrency checks, first-start/repeat-start worker behavior,
 atomic seed, container recreation, and test isolation. All criteria must pass
@@ -141,7 +141,7 @@ surfaced rather than silently changing this contract.
 Planning result: the specification and ordered implementation plan are prepared;
 that planning result alone did not establish persistence delivery. The user has
 since approved the specification and its ordered execution plan. Actual P1
-implementation validation is recorded in [P1 evidence](p1-validation.md).
+implementation validation is recorded in [P1 evidence](plans/p1-validation.md).
 Publication of implementation changes is a separate user request.
 
 Implementation verified on 2026-09-15: all P1 acceptance rows passed on Windows
@@ -153,7 +153,7 @@ EF found no pending model changes. Application.Tests still reports zero tests
 and MTP exit 8, as required until B1. Local startup/EF commands, documentation
 links, solution paths and diff checks passed. CI's Linux sequence passed locally;
 a hosted Actions run and merge awaited publication at that initial handoff.
-See the complete [P1 validation record](p1-validation.md); those local checks
+See the complete [P1 validation record](plans/p1-validation.md); those local checks
 established Verified before publication.
 
 Subsequent NameIdentity refinement on the same date adds explicit null guards
@@ -179,7 +179,7 @@ registration, and diff whitespace checks passed. No runtime behavior changed.
 
 ### B1: Transactional booking application use case
 
-The maintainer approved the [complete B1 plan](b1-booking-implementation-plan.md)
+The maintainer approved the [complete B1 plan](plans/b1-booking-implementation-plan.md)
 on 2026-09-16. Scope includes the booking portion of H1 and Swagger UI, with no
 automatic booking retries, idempotency keys, or new schema.
 
@@ -201,7 +201,7 @@ All 167 tests passed on Windows (90 Domain, 17 Application, 48 Integration,
 12 AppHost), without skips. Restore, Release build with zero warnings/errors,
 EF model check, OpenAPI/Swagger HTTP checks, documentation links/solution items,
 and diff checks passed. Application.Tests is now part of CI. See the
-[command and evidence record](b1-booking-implementation-plan.md#9-implementation-and-validation-record).
+[command and evidence record](plans/b1-booking-implementation-plan.md#9-implementation-and-validation-record).
 
 Completion recorded on 2026-09-16 at the maintainer's request: after
 `git fetch origin`, both local `main` and `origin/main` resolve to
@@ -215,7 +215,7 @@ R1, A1, reports, and the remaining H1 operations are outside this delivery.
 
 ### R1: Room management and lifecycle restrictions
 
-The maintainer approved the [R1 execution plan](r1-room-management-plan.md) on
+The maintainer approved the [R1 execution plan](plans/r1-room-management-plan.md) on
 2026-09-16. Scope includes its three H1 operations and a supporting GET /rooms/{id}
 for conditional editing. Services match by normalized names; spelling updates
 retain IDs, renamed offerings receive new IDs. PUT is a complete replacement.
@@ -245,7 +245,7 @@ rollback, cancellation, safe errors and HTTP/OpenAPI contracts passed. All 225
 tests passed on Windows (101 Domain, 27 Application, 85 Integration, 12 AppHost),
 without skips. Restore, Release build with zero warnings/errors, EF model check,
 71 local documentation links/anchors, 35 solution paths, document registration
-and diff checks passed. See the [validation record](r1-room-management-plan.md#validation-record).
+and diff checks passed. See the [validation record](plans/r1-room-management-plan.md#validation-record).
 
 Completion recorded on 2026-09-16 at the maintainer's request: after
 `git fetch origin`, both local `main` and `origin/main` resolve to
@@ -258,7 +258,7 @@ final delivery. A1 and reports remain separate tasks.
 
 ### A1: Availability search
 
-The maintainer approved the [A1 plan](a1-availability-search-plan.md) on
+The maintainer approved the [A1 plan](plans/a1-availability-search-plan.md) on
 2026-09-16, authorizing feature-branch creation and specification preparation
 first. The maintainer subsequently authorized Domain unit 1, introduced
 RentalPeriod in fb72fc2, and explicitly authorized unit 2 and all following
@@ -298,7 +298,7 @@ current offerings, safe failures, cancellation, and booking conflicts after
 search. All 290 tests passed on Windows (111 Domain, 45 Application, 122
 Integration, 12 AppHost), without skips. Restore, Release build with zero
 warnings/errors, EF model consistency, documentation/solution checks, and diff
-checks passed. See the [validation record](a1-availability-search-plan.md#8-implementation-and-validation-record).
+checks passed. See the [validation record](plans/a1-availability-search-plan.md#8-implementation-and-validation-record).
 That pre-merge validation did not include a hosted Linux CI run; Q1 remains
 separate work.
 
@@ -331,6 +331,20 @@ Completion criteria:
 
 ### Q1: Reports and assignment completion
 
+The maintainer approved the [Q1 plan](plans/q1-reports-plan.md) and its execution
+on 2026-09-17. Scope is GET /reports/rooms and GET /reports/services with the
+existing snapshot and reporting-period rules. Confirmed decisions: exact
+case-sensitive service-name grouping, rooms with selected bookings only, all
+groups without pagination, and decimal booked seconds with microsecond precision.
+Unselected alternatives are documented as optional future work in the plan;
+they are not remaining Q1 requirements. The broader readability/error-result
+refactor is outside Q1.
+
+Preparation used feature/booking-reports from fetched origin/main d851fdc,
+which contains the completed B1/R1/A1/H1 prerequisites. Detailed task documents
+now live under docs/plans with corresponding solution registration and rebased
+links; previous plan contents and historical evidence were preserved.
+
 Completion criteria:
 
 - Both agreed reports use recorded prices and the documented reporting period
@@ -339,6 +353,24 @@ Completion criteria:
   assignment and decision docs; Q1 verifies their end-to-end use.
 - Documentation accurately describes the implemented scope and verified commands.
 - All relevant implemented test suites pass; limitations are explicitly recorded.
+
+Verified on 2026-09-17: both reports filter and aggregate recorded values in one
+parameterized PostgreSQL statement each. Tests verify period boundaries, exact
+decimal seconds and money, no join multiplication, full results, historical
+prices/deleted rooms, name grouping and sorting, safe failures and cancellation.
+The real demo seed -> search -> HTTP booking -> reports scenario produces
+8600 UAH rental + 800 UAH services = 9400 UAH. All 320 tests passed on Windows
+(111 Domain, 54 Application, 143 Integration, 12 AppHost), without skips. Tool
+and package restore, Release build with zero warnings/errors, EF model check,
+documentation links/solution folders, formatting and diff checks passed.
+See the [validation record](plans/q1-reports-plan.md#9-implementation-and-validation-record).
+
+The implementation remains local and unmerged. At the initial verification
+handoff, no hosted Linux CI run, commit, push, PR or merge had been performed.
+Reports intentionally return all groups without pagination and do not promise
+a shared snapshot across separate requests.
+After confirmed merge and relevant checks, record the merge reference and mark
+Q1 Done under CONTRIBUTING's final roadmap-update process.
 
 ## Record each task result
 

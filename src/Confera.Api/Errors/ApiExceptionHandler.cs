@@ -1,5 +1,6 @@
 using Confera.Application.Availability;
 using Confera.Application.Bookings;
+using Confera.Application.Reports;
 using Confera.Application.Rooms;
 using Confera.Domain.Bookings;
 using Confera.Domain.Rooms;
@@ -18,6 +19,12 @@ internal sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) :
 
         var (status, code, detail) = exception switch
         {
+            ReportOperationException { Failure: ReportFailure.InvalidRequest } =>
+                (400, "invalid_request", "Supply start and end with explicit-offset timestamps and whole-microsecond precision."),
+            ReportOperationException { Failure: ReportFailure.InvalidPeriod } =>
+                (400, "invalid_report_period", "Report endpoints must be UTC instants with whole-microsecond precision, and end must follow start."),
+            ReportOperationException { Failure: ReportFailure.PersistenceUnavailable } =>
+                (503, "report_persistence_unavailable", "Reporting is temporarily unavailable."),
             AvailabilityOperationException { Failure: AvailabilityFailure.InvalidRequest } =>
                 (400, "invalid_request", "Supply explicit-offset timestamps, a positive capacity and valid page/pageSize values."),
             AvailabilityOperationException { Failure: AvailabilityFailure.PersistenceUnavailable } =>

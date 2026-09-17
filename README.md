@@ -7,8 +7,8 @@ The project covers conference room management, availability search, bookings, re
 ## Project status
 
 Room creation, reading, replacement and soft deletion, paginated availability
-search, transactional booking creation through `POST /bookings`, Domain pricing,
-and PostgreSQL persistence are implemented. Bookings
+search, transactional booking creation through `POST /bookings`, room/service
+reports, Domain pricing, and PostgreSQL persistence are implemented. Bookings
 preserve UTC microsecond instants, rounded tariff segments, selected services,
 and prices as historical snapshots. PostgreSQL enforces active room/service
 name integrity, globally unique tariff priorities, and concurrent booking
@@ -29,9 +29,10 @@ Room updates and deletion share booking's room-row lock. Capacity reduction and
 deletion reject ongoing/future bookings. GET returns an ETag; PUT and deletion
 of an active room require If-Match to prevent stale writes. Room/service changes
 rotate a UUID version; no-op replacements and bookings retain it. Availability
-search shares the validated RentalPeriod and tariff coverage with booking;
-both reports remain planned. The roadmap records validation and
-merge status separately from implemented behavior.
+search shares the validated RentalPeriod and tariff coverage with booking.
+Reports aggregate recorded booking values in PostgreSQL, including deleted-room
+history. The roadmap records validation and merge status separately from
+implemented behavior.
 
 The original requirements and project decisions are documented separately:
 
@@ -39,19 +40,20 @@ The original requirements and project decisions are documented separately:
 - [Domain model, API scope, initial data, and reports](docs/domain-model.md).
 - [Booking, pricing, room changes, and deletion rules](docs/booking-and-pricing-rules.md).
 - [Implementation roadmap, task status, and completion criteria](docs/implementation-roadmap.md).
-- [Complete P1 persistence specification and implementation plan](docs/p1-persistence-specification.md).
-- [Approved B1 booking implementation plan and API contract](docs/b1-booking-implementation-plan.md).
-- [Approved R1 room management and concurrency contract](docs/r1-room-management-plan.md).
-- [A1 availability search contract, implementation plan, and validation](docs/a1-availability-search-plan.md).
+- [Complete P1 persistence specification and implementation plan](docs/plans/p1-persistence-specification.md).
+- [Approved B1 booking implementation plan and API contract](docs/plans/b1-booking-implementation-plan.md).
+- [Approved R1 room management and concurrency contract](docs/plans/r1-room-management-plan.md).
+- [A1 availability search contract, implementation plan, and validation](docs/plans/a1-availability-search-plan.md).
+- [Approved Q1 reports contract and implementation plan](docs/plans/q1-reports-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
-- [P1 acceptance evidence](docs/p1-validation.md).
+- [P1 acceptance evidence](docs/plans/p1-validation.md).
 
 The agreed scope is the assignment's five core API operations plus two read-only
 reports and a supporting room-by-ID read for conditional editing. Booking and
 tariff times use UTC; bookings last 30 minutes to 24 hours
 with full tariff coverage. Confirmed prices and selected services are preserved
-as snapshots. The decision documents describe the target behavior, including
-rules that the current domain foundation does not yet enforce.
+as snapshots. Application and persistence enforce cross-booking rules alongside
+the Domain invariants; deferred extensions are recorded in the decision documents.
 
 ## Run and validate
 
@@ -95,6 +97,16 @@ fields and the complete services array; `[]` removes all current services.
 It returns 200 with current data; GET supplies the next ETag. Repeated deletion
 returns 204, including an old or absent condition. See the
 [room editing example](docs/local-development.md#manage-rooms-with-etag).
+
+`GET /reports/rooms?start=2030-01-01T00:00:00Z&end=2030-02-01T00:00:00Z`
+returns booking count, decimal booked seconds, rental/service values, and their
+total by room ID. `/reports/services` accepts the same period and returns selection
+count and value by exact recorded service name, case-sensitively. Both select
+bookings starting within `[start, end)` and include each in full. Periods may be
+past or future and are not restricted by booking duration limits. Responses
+contain UTC start/end, currency UAH, and all grouped items without pagination;
+rooms without selected bookings are omitted. See the
+[report examples and limitations](docs/local-development.md#read-booking-reports).
 
 Overlaps return `409`; adjacent bookings are allowed. Booking writes have no
 automatic retries or idempotency keys. A lost response may follow a successful

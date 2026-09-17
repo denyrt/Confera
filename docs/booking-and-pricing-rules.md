@@ -69,7 +69,7 @@ rooms and includes services in one statement. The page query sees a coherent
 room/service/booking state, but its snapshot can differ from the tariff read.
 Search uses no explicit transaction or row locks. Each page is a fresh read;
 concurrent changes can shift results. Responses use no-store, and booking still
-checks all current conditions. See the [A1 contract](a1-availability-search-plan.md).
+checks all current conditions. See the [A1 contract](plans/a1-availability-search-plan.md).
 
 ### Booking transaction and room changes
 
@@ -216,7 +216,7 @@ Unicode simple uppercase consistent with PostgreSQL 18's `pg_c_utf8`, with
 ordinal key comparison. Preserve display spelling, internal spaces, accents,
 and alphabets. Generated database keys prevent bypass through direct SQL.
 The exact algorithm, .NET/SQL conformance checks, and whitespace set are defined
-in the [P1 specification](p1-persistence-specification.md#names-and-identity).
+in the [P1 specification](plans/p1-persistence-specification.md#names-and-identity).
 
 Deleting a room is a soft-delete: retain its identity and booking history, exclude
 it from availability search, and reject new bookings for it. Reject deletion
@@ -244,11 +244,11 @@ validator. No automatic merge or write replay is performed.
 An absent room returns 404. Read/update of a deleted room returns 404; a repeated
 DELETE returns 204 even with an old or missing condition, retaining its services
 and booking history. There is no restore endpoint. The
-[R1 contract](r1-room-management-plan.md) records the complete protocol.
+[R1 contract](plans/r1-room-management-plan.md) records the complete protocol.
 
 ## Persistence and initial data
 
-[P1's complete specification](p1-persistence-specification.md) defines the
+[P1's complete specification](plans/p1-persistence-specification.md) defines the
 initial schema, MigrationWorker, `postgres:18.6`, test isolation, and acceptance
 checks. P1 includes `Room.IsDeleted` and active-name uniqueness; R1 adds room
 lifecycle operations, booking-dependent restrictions and the UUID version migration.
