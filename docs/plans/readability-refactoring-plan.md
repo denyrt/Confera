@@ -2,36 +2,35 @@
 
 The maintainer accepted the recommendations below on 2026-09-18 and authorized
 creating `feature/readability-refactoring`, preparing documentation as its first
-changes, and making one local documentation commit. **Implementation requires
-a subsequent explicit instruction from the maintainer.** This approval does
-not authorize a push, pull request, or merge.
+changes, and making one local documentation commit (`4c2e1f5`). The maintainer
+subsequently authorized implementation of the agreed boundary refactor on the
+same date. Publication, a pull request, and merging remain separate actions.
 
-RF1 remains Planned in the [roadmap](../implementation-roadmap.md). The design
-is agreed; the code examples describe intended structure and are not implemented
-or compiled acceptance evidence. Later implementation must continue on this
-task branch, subject to the maintainer's instructions.
+RF1 is Verified in the [roadmap](../implementation-roadmap.md). The examples
+describe the agreed structure; actual implementation and validation are recorded
+below. The boundary implementation remains local and unmerged on the task branch.
 
-## 1. Outcome and current problem
+## 1. Outcome and baseline problem
 
 Make expected operation outcomes visible in Application signatures and make
 their HTTP mapping visible when reading the corresponding controller. Preserve
 the existing observable behavior while improving the path a reader follows.
 
-At the preparation baseline, `origin/main` is `3f4c2f7`, containing the completed
+At the preparation baseline, `origin/main` was `3f4c2f7`, containing the completed
 B1, R1, A1, H1, and Q1 work. The working tree was clean before branch creation.
 
-- Controllers normally show only success. For example,
+- Controllers normally showed only success. For example,
   [BookingsController](../../src/Confera.Api/Bookings/BookingsController.cs)
-  returns 201 after calling the service.
+  returned 201 after calling the service.
 - [ApiExceptionHandler](../../src/Confera.Api/Errors/ApiExceptionHandler.cs)
-  maps expected failures from all four feature areas, including Domain
+  mapped expected failures from all four feature areas, including Domain
   validation exceptions, to HTTP responses.
 - Request helpers such as `RoomRequest.ToCommand`, `ReportRequest.ToUtc`, and
-  `RoomEntityTags.Parse` can throw application exceptions before the use case
-  runs. Their conversion-oriented names do not expose that failure path.
-- Infrastructure already recognizes specific constraints and temporary failures.
-  Application tests often assert exception types; HTTP tests protect the public
-  contract and can continue to do so after internal restructuring.
+  `RoomEntityTags.Parse` could throw application exceptions before the use case
+  ran. Their conversion-oriented names did not expose that failure path.
+- Infrastructure already recognized specific constraints and temporary failures.
+  Application tests often asserted exception types; HTTP tests protected the
+  public contract and continue to do so after internal restructuring.
 
 The [B1 contract](b1-booking-implementation-plan.md#5-http-contract),
 [R1 contract](r1-room-management-plan.md#version-and-http-preconditions),
@@ -52,7 +51,7 @@ implementation and validation records.
 | Migration depth | First make Application-to-API outcomes explicit. Known Domain and persistence exceptions may be adapted at the Application boundary during this stage. |
 | Request conversion | Expose ordinary parsing or input-conversion failures through `Try...` methods or typed results. Retain the existing automatic `[ApiController]` model validation. |
 | Compatibility | Preserve statuses, codes, bodies, headers, validation precedence, transaction behavior, cancellation, and the absence of automatic retries. |
-| Execution | Document first, then wait for implementation authorization. Booking is the first complete implementation example; apply the evaluated approach to the other operations afterward. |
+| Execution | Documentation was committed first; units 1-4 were subsequently authorized. Booking established the complete example before the approach was applied to the other operations. |
 
 The exact private helper names and file organization are implementation details
 within these decisions. Introducing a package, changing dependency direction or
@@ -231,15 +230,23 @@ Before migration, inventory relevant detail messages and mixed-invalid-input
 precedence from the code and tests; do not replace these with a generic message
 or reorder guards as incidental cleanup.
 
+The old exception middleware also supplied `Cache-Control: no-cache,no-store`,
+`Pragma: no-cache`, `Expires: -1`, and removed ETag on failures. Its default
+ProblemDetails writer used the current Activity ID for `traceId`, falling back
+to the request identifier. `ApiProblems.Response` preserves this metadata for
+the migrated expected responses, including 428. Automatic model-state responses
+retain their separate existing factory. These implicit middleware behaviors
+were identified and covered during RF1 compatibility verification.
+
 ## 7. Ordered work and authorization
 
 | Unit | Scope | Current authorization |
 | --- | --- | --- |
 | 0. Preparation | Create the task branch, write this plan, register it in README/solution/roadmap, validate documentation, and make the first local commit. | Authorized on 2026-09-18. |
-| 1. Booking example | Add the minimal result contracts and booking errors, migrate the booking service and controller, preserve diagnostics, and adapt relevant tests. | Awaiting implementation instruction. |
-| 2. Room operations | Apply the evaluated approach to room CRUD, explicit request/If-Match parsing, no-payload results, and concurrency/lifecycle outcomes. | Awaiting implementation instruction. |
-| 3. Read operations | Migrate availability and reports, including visible timestamp parsing and their distinct empty-result/validation behavior. | Awaiting implementation instruction. |
-| 4. Boundary completion | Finish removal of expected-error mappings from the global handler, verify all contracts, and update current architecture documentation and roadmap evidence. | Awaiting implementation instruction. |
+| 1. Booking example | Add the minimal result contracts and booking errors, migrate the booking service and controller, preserve diagnostics, and adapt relevant tests. | Authorized on 2026-09-18; implemented. |
+| 2. Room operations | Apply the evaluated approach to room CRUD, explicit request/If-Match parsing, no-payload results, and concurrency/lifecycle outcomes. | Authorized on 2026-09-18; implemented. |
+| 3. Read operations | Migrate availability and reports, including visible timestamp parsing and their distinct empty-result/validation behavior. | Authorized on 2026-09-18; implemented. |
+| 4. Boundary completion | Finish removal of expected-error mappings from the global handler, verify all contracts, and update current architecture documentation and roadmap evidence. | Authorized on 2026-09-18; implemented and verified with all four suites. |
 
 Unit 1 is the first design checkpoint. Assess whether its controller and service
 can be understood locally before replicating the pattern. A future instruction
@@ -325,4 +332,75 @@ to make a check pass.
   registrations, and the plan's `/docs/plans/` solution folder. Diff review and
   whitespace checks passed. Runtime tests were not run for documentation-only
   changes; the build does not compile or validate the illustrative snippets.
-- Implementation: not started. No RF1 runtime validation has been performed.
+- This preparation record predates implementation authorization and is retained
+  as documentation-only evidence.
+
+## 11. Implementation and validation record
+
+On 2026-09-18 the maintainer authorized implementation of units 1-4 on the
+existing task branch. Domain validation follow-up remains a later checkpoint.
+
+Delivered behavior:
+
+- Own result contracts use explicit factories, reject missing required payloads,
+  and reject access to the inactive branch. Successful HTTP DTOs are unchanged.
+- Booking, room CRUD, availability, and reports return feature-specific errors;
+  actions or private controller methods choose every expected HTTP response.
+  Known Domain/persistence exceptions remain internal adapters at this stage.
+- Request/If-Match parsing uses `Try...` methods. Missing conditions reach the
+  use case, preserving repeated deletion and lifecycle/version precedence.
+- The global handler retains only unexpected-error handling. Infrastructure
+  logs recognized technical failures once at the translation boundary, keeping
+  the original cause chain and ambient request/trace scope. Provider diagnostics
+  are not copied into public errors.
+- Compatibility coverage preserves the implicit error cache headers and
+  Activity-based trace ID described in section 6, plus existing HTTP/OpenAPI,
+  cancellation, concurrency, snapshots, query behavior, and no-retry contracts.
+- Added 15 Application cases for result invariants, transaction acquisition and
+  disposal failures, and cancellation races; added nine HTTP cases for mixed
+  input precedence, technical diagnostics, trace correlation, and cache headers.
+
+Validation commands (Release, 2026-09-18 local date):
+
+```powershell
+dotnet build Confera.slnx --configuration Release --no-restore
+dotnet test --project tests/Confera.Domain.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/rf1/domain
+dotnet test --project tests/Confera.Application.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/rf1/application-final
+# Windows: use the selected Docker context, without an explicit pipe override.
+Remove-Item Env:DOCKER_HOST -ErrorAction SilentlyContinue
+dotnet test --project tests/Confera.Integration.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/rf1/integration-final
+dotnet test --project tests/Confera.AppHost.Tests --configuration Release --no-build --report-trx --results-directory artifacts/tests/rf1/apphost-default-context
+```
+
+| Check | Result |
+| --- | --- |
+| Release build | Passed; zero warnings/errors. |
+| Domain | 111 passed. |
+| Application | 69 passed. |
+| Integration / PostgreSQL / HTTP / OpenAPI | 152 passed. |
+| AppHost / MigrationWorker | 12 passed with normal Docker context discovery. |
+| EF pending-model check | No changes since the last migration. |
+| Documentation | 111 local links/anchors, 38 solution paths, all 17 Markdown registrations passed. |
+| Source review and whitespace | Changed/new files reviewed; scoped `dotnet format whitespace` and `git diff --check` passed. |
+
+All 344 tests passed in the final suite runs, with zero failures or skips.
+
+The EF check used the existing design-time procedure with
+`ConnectionStrings__confera=Host=localhost;Database=design_time_only` and
+`dotnet ef migrations has-pending-model-changes --project
+src/Confera.Infrastructure --configuration Release --no-build`.
+
+The first new diagnostic tests revealed framework exception wrapping and the
+different trace-ID source in the default ProblemDetails writer; assertions now
+check the preserved cause chain, and explicit responses retain the old metadata.
+The complete Integration suite passed after these corrections. Initial AppHost
+attempts used explicit pipe forms incompatible with either Docker CLI or
+Testcontainers. All 12 AppHost tests passed using normal context discovery as
+already documented in local-development guidance; no runtime or test code was
+changed for this issue.
+
+TRX evidence is under the ignored `artifacts/tests/rf1` directories above;
+filenames use UTC timestamps on 2026-09-17. Hosted Linux CI has not been run for
+this local change. No Domain rules, schema, dependencies, or project references
+changed. Implementation remains local and unmerged; marking RF1 Done requires
+merge confirmation. Domain validation follow-up still needs its own checkpoint.

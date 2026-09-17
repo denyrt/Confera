@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using Confera.Api.Time;
 using Confera.Application.Availability;
 using Microsoft.AspNetCore.Mvc;
@@ -17,13 +18,15 @@ public sealed class AvailabilityRequest
     [FromQuery(Name = "capacity"), Required, BindRequired, Range(1, int.MaxValue)]
     public int Capacity { get; init; }
 
-    internal AvailabilityQuery ToQuery(int page, int pageSize)
+    internal bool TryToQuery(int page, int pageSize, [NotNullWhen(true)] out AvailabilityQuery? query)
     {
+        query = null;
         if (!ApiTimestamp.TryParse(Start, out var start) || !ApiTimestamp.TryParse(End, out var end))
         {
-            throw new AvailabilityOperationException(AvailabilityFailure.InvalidRequest);
+            return false;
         }
 
-        return new AvailabilityQuery(start.UtcDateTime, end.UtcDateTime, Capacity, page, pageSize);
+        query = new AvailabilityQuery(start.UtcDateTime, end.UtcDateTime, Capacity, page, pageSize);
+        return true;
     }
 }

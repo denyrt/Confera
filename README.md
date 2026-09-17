@@ -34,6 +34,11 @@ Reports aggregate recorded booking values in PostgreSQL, including deleted-room
 history. The roadmap records validation and merge status separately from
 implemented behavior.
 
+Application use cases return typed results for expected outcomes. Controllers
+show their success and error responses explicitly, using shared ProblemDetails
+formatting. The global exception handler handles unexpected failures; known
+Domain and persistence exceptions are adapted inside Application for now.
+
 The original requirements and project decisions are documented separately:
 
 - [Technical assignment](docs/task-specification.md) ([Ukrainian](docs/task-specification.uk.md)).
@@ -45,7 +50,7 @@ The original requirements and project decisions are documented separately:
 - [Approved R1 room management and concurrency contract](docs/plans/r1-room-management-plan.md).
 - [A1 availability search contract, implementation plan, and validation](docs/plans/a1-availability-search-plan.md).
 - [Approved Q1 reports contract and implementation plan](docs/plans/q1-reports-plan.md).
-- [Approved readability refactoring plan; implementation awaits authorization](docs/plans/readability-refactoring-plan.md).
+- [Readability refactoring plan and validation](docs/plans/readability-refactoring-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/plans/p1-validation.md).
 

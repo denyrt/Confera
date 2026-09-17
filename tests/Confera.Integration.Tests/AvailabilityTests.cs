@@ -11,6 +11,7 @@ using Confera.Infrastructure.Persistence;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using static Confera.Integration.Tests.BookingHttpTests;
 using static Confera.Integration.Tests.BookingTestSupport;
@@ -44,7 +45,7 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
         for (var pageNumber = 1; pageNumber <= 3; pageNumber++)
         {
             observer.Commands.Clear();
-            var page = await service.SearchAsync(new(At(11), At(15), 50, pageNumber, 2), TestContext.Current.CancellationToken);
+            var page = (await service.SearchAsync(new(At(11), At(15), 50, pageNumber, 2), TestContext.Current.CancellationToken)).Value;
             Assert.Equal(expected.Skip((pageNumber - 1) * 2).Take(2).Select(x => x.Id), page.Items.Select(x => x.Id));
             Assert.Equal(pageNumber == 1, page.HasNextPage);
             collected.AddRange(page.Items.Select(x => x.Id));
@@ -70,7 +71,7 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
         }
 
         Assert.Equal(expected.Select(x => x.Id), collected);
-        var largeCapacity = await service.SearchAsync(new(At(11), At(15), int.MaxValue), TestContext.Current.CancellationToken);
+        var largeCapacity = (await service.SearchAsync(new(At(11), At(15), int.MaxValue), TestContext.Current.CancellationToken)).Value;
         Assert.Empty(largeCapacity.Items);
     }
 
@@ -92,7 +93,7 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var page = await Search(database).SearchAsync(new(At(11), At(15), 50), TestContext.Current.CancellationToken);
+        var page = (await Search(database).SearchAsync(new(At(11), At(15), 50), TestContext.Current.CancellationToken)).Value;
         Assert.Equal(available, page.Items.Any(x => x.Id == room.Id));
         Assert.Contains(page.Items, x => x.Id == other.Id);
     }
@@ -111,8 +112,8 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
         }
 
         var observer = new SearchReadObserver();
-        var page = await Search(database, observer).SearchAsync(new(At(22), At(0).AddDays(1), 50, 4),
-            TestContext.Current.CancellationToken);
+        var page = (await Search(database, observer).SearchAsync(new(At(22), At(0).AddDays(1), 50, 4),
+            TestContext.Current.CancellationToken)).Value;
         Assert.Empty(page.Items);
         Assert.Equal((4, 20, false), (page.Page, page.PageSize, page.HasNextPage));
         Assert.Single(observer.Commands);
@@ -224,9 +225,10 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
         using var client = factory.CreateHttpsClient();
         var before = (await client.GetFromJsonAsync<AvailabilityPage>(Url(), TestContext.Current.CancellationToken))!.Items[0];
         var oldWifi = before.Services.Single(x => x.Name == "Wi-Fi").Id;
-        var management = new RoomManagementService(new RoomStore(new BookingContextFactory(database)), new BookingClock(At(9)));
-        await management.UpdateAsync(room.Id, new RoomCommand("Room A", 50, 2500m,
+        var management = new RoomManagementService(new RoomStore(new BookingContextFactory(database), NullLogger<RoomStore>.Instance), new BookingClock(At(9)));
+        var updated = await management.UpdateAsync(room.Id, new RoomCommand("Room A", 50, 2500m,
             [new("Projector", 600m), new("Sound", 700m)]), [room.Version], TestContext.Current.CancellationToken);
+        Assert.True(updated.IsSuccess);
 
         var current = (await client.GetFromJsonAsync<AvailabilityPage>(Url(), TestContext.Current.CancellationToken))!.Items[0];
         Assert.Equal(2500m, current.HourlyRate);
@@ -278,7 +280,7 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
         await cancellation.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => search);
         Assert.Single(observer.Commands);
-        Assert.NotEmpty((await Search(database).SearchAsync(new(At(11), At(15), 50), TestContext.Current.CancellationToken)).Items);
+        Assert.NotEmpty((await Search(database).SearchAsync(new(At(11), At(15), 50), TestContext.Current.CancellationToken)).Value.Items);
     }
 
     [Fact]
@@ -308,7 +310,7 @@ public sealed class AvailabilityTests(PostgresFixture postgres)
     }
 
     private static SearchAvailabilityService Search(TestDatabase database, params IInterceptor[] interceptors) =>
-        new(new AvailabilityReader(new BookingContextFactory(database, interceptors)), new BookingClock(At(9)));
+        new(new AvailabilityReader(new BookingContextFactory(database, interceptors), NullLogger<AvailabilityReader>.Instance), new BookingClock(At(9)));
 
     private static Dictionary<string, string?> Query() => new()
     {

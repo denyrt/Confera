@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Confera.Application.Reports;
 
 public sealed record ReportPeriod
@@ -13,12 +15,22 @@ public sealed record ReportPeriod
 
     public static ReportPeriod Create(DateTime startsAtUtc, DateTime endsAtUtc)
     {
+        return TryCreate(startsAtUtc, endsAtUtc, out var period)
+            ? period
+            : throw new ReportOperationException(ReportFailure.InvalidPeriod);
+    }
+
+    public static bool TryCreate(DateTime startsAtUtc, DateTime endsAtUtc,
+        [NotNullWhen(true)] out ReportPeriod? period)
+    {
+        period = null;
         if (startsAtUtc.Kind != DateTimeKind.Utc || endsAtUtc.Kind != DateTimeKind.Utc
             || startsAtUtc.Ticks % 10 != 0 || endsAtUtc.Ticks % 10 != 0 || endsAtUtc <= startsAtUtc)
         {
-            throw new ReportOperationException(ReportFailure.InvalidPeriod);
+            return false;
         }
 
-        return new ReportPeriod(startsAtUtc, endsAtUtc);
+        period = new ReportPeriod(startsAtUtc, endsAtUtc);
+        return true;
     }
 }

@@ -32,13 +32,11 @@ public sealed class ReportServiceTests
         var reader = new TestReader();
         var service = new ReportService(reader);
 
-        var roomError = await Assert.ThrowsAsync<ReportOperationException>(() =>
-            service.GetRoomsAsync(start, end, TestContext.Current.CancellationToken));
-        var serviceError = await Assert.ThrowsAsync<ReportOperationException>(() =>
-            service.GetServicesAsync(start, end, TestContext.Current.CancellationToken));
+        var rooms = await service.GetRoomsAsync(start, end, TestContext.Current.CancellationToken);
+        var services = await service.GetServicesAsync(start, end, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ReportFailure.InvalidPeriod, roomError.Failure);
-        Assert.Equal(ReportFailure.InvalidPeriod, serviceError.Failure);
+        Assert.Equal(ReportError.InvalidPeriod, rooms.Error);
+        Assert.Equal(ReportError.InvalidPeriod, services.Error);
         Assert.Empty(reader.Reads);
     }
 
@@ -56,10 +54,10 @@ public sealed class ReportServiceTests
         var rooms = await service.GetRoomsAsync(start, end, cancellation.Token);
         var services = await service.GetServicesAsync(start, end, cancellation.Token);
 
-        Assert.Equal((start, end, "UAH"), (rooms.Start, rooms.End, rooms.Currency));
-        Assert.Equal((start, end, "UAH"), (services.Start, services.End, services.Currency));
-        Assert.Empty(rooms.Items);
-        Assert.Empty(services.Items);
+        Assert.Equal((start, end, "UAH"), (rooms.Value.Start, rooms.Value.End, rooms.Value.Currency));
+        Assert.Equal((start, end, "UAH"), (services.Value.Start, services.Value.End, services.Value.Currency));
+        Assert.Empty(rooms.Value.Items);
+        Assert.Empty(services.Value.Items);
         Assert.Equal(new[] { "rooms", "services" }, reader.Reads);
         Assert.Equal(ReportPeriod.Create(start, end), reader.Period);
         Assert.Equal(cancellation.Token, reader.Token);

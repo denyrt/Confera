@@ -5,6 +5,7 @@ using Confera.Domain.Rooms;
 using Confera.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using static Confera.Integration.Tests.BookingTestSupport;
 
@@ -33,7 +34,7 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
         {
             new RoomReportRow(other.Id, "Room B", 1, 14400m, 15050m, 0m, 15050m),
             new RoomReportRow(room.Id, "Room A", 2, 18000m, 10600m, 1300m, 11900m)
-        }, report.Items);
+        }, report.Value.Items);
         Assert.Single(observer.Commands);
         Assert.Equal(2, observer.ParameterCounts.Single());
         Assert.Contains("GROUP BY", observer.Commands.Single(), StringComparison.OrdinalIgnoreCase);
@@ -57,12 +58,12 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
         var reports = Reports(database);
         var rooms = await reports.GetRoomsAsync(At(11), At(12), TestContext.Current.CancellationToken);
         var services = await reports.GetServicesAsync(At(11), At(12), TestContext.Current.CancellationToken);
-        Assert.Equal(new RoomReportRow(room.Id, room.Name, 1, 14400m, 8600m, 800m, 9400m), Assert.Single(rooms.Items));
-        Assert.Equal(new[] { new ServiceReportRow("Projector", 1, 500m), new ServiceReportRow("Wi-Fi", 1, 300m) }, services.Items);
+        Assert.Equal(new RoomReportRow(room.Id, room.Name, 1, 14400m, 8600m, 800m, 9400m), Assert.Single(rooms.Value.Items));
+        Assert.Equal(new[] { new ServiceReportRow("Projector", 1, 500m), new ServiceReportRow("Wi-Fi", 1, 300m) }, services.Value.Items);
 
         // All three bookings were created at 09:00, but none starts in this window.
-        Assert.Empty((await reports.GetRoomsAsync(At(9), At(10), TestContext.Current.CancellationToken)).Items);
-        Assert.Empty((await reports.GetServicesAsync(At(9), At(10), TestContext.Current.CancellationToken)).Items);
+        Assert.Empty((await reports.GetRoomsAsync(At(9), At(10), TestContext.Current.CancellationToken)).Value.Items);
+        Assert.Empty((await reports.GetServicesAsync(At(9), At(10), TestContext.Current.CancellationToken)).Value.Items);
     }
 
     [Fact]
@@ -82,9 +83,9 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
 
         // A one-microsecond report window is valid and includes the complete booking.
         var report = await Reports(database).GetRoomsAsync(start, start.AddTicks(10), TestContext.Current.CancellationToken);
-        Assert.Equal(new RoomReportRow(room.Id, room.Name, 1, 1800.000001m, 500.001m, 200.123m, 700.124m), Assert.Single(report.Items));
+        Assert.Equal(new RoomReportRow(room.Id, room.Name, 1, 1800.000001m, 500.001m, 200.123m, 700.124m), Assert.Single(report.Value.Items));
         var services = await Reports(database).GetServicesAsync(start, start.AddTicks(10), TestContext.Current.CancellationToken);
-        Assert.Equal(new ServiceReportRow("Service", 1, 200.123m), Assert.Single(services.Items));
+        Assert.Equal(new ServiceReportRow("Service", 1, 200.123m), Assert.Single(services.Value.Items));
     }
 
     [Fact]
@@ -115,16 +116,16 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
 
         var reports = Reports(database);
         var rooms = await reports.GetRoomsAsync(At(0), At(0).AddDays(1), TestContext.Current.CancellationToken);
-        Assert.Equal(2, rooms.Items.Count);
-        Assert.All(rooms.Items, x => Assert.Equal("Renamed room", x.RoomName));
-        Assert.Equal(new RoomReportRow(room.Id, "Renamed room", 2, 18000m, 12600m, 1700m, 14300m), rooms.Items[0]);
-        Assert.NotEqual(room.Id, rooms.Items[1].RoomId);
-        Assert.Equal(1000m, rooms.Items[1].TotalValue);
+        Assert.Equal(2, rooms.Value.Items.Count);
+        Assert.All(rooms.Value.Items, x => Assert.Equal("Renamed room", x.RoomName));
+        Assert.Equal(new RoomReportRow(room.Id, "Renamed room", 2, 18000m, 12600m, 1700m, 14300m), rooms.Value.Items[0]);
+        Assert.NotEqual(room.Id, rooms.Value.Items[1].RoomId);
+        Assert.Equal(1000m, rooms.Value.Items[1].TotalValue);
         var services = await reports.GetServicesAsync(At(0), At(0).AddDays(1), TestContext.Current.CancellationToken);
         Assert.Equal(new[]
         {
             new ServiceReportRow("Equipment", 1, 900m), new ServiceReportRow("Projector", 1, 500m), new ServiceReportRow("Wi-Fi", 1, 300m)
-        }, services.Items);
+        }, services.Value.Items);
     }
 
     [Fact]
@@ -152,7 +153,7 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
         Assert.Equal(new[]
         {
             new ServiceReportRow("Projector", 2, 1100m), new ServiceReportRow("Wi-Fi", 1, 300m), new ServiceReportRow("projector", 1, 700m)
-        }, report.Items);
+        }, report.Value.Items);
         Assert.Single(observer.Commands);
         Assert.Equal(2, observer.ParameterCounts.Single());
         Assert.Contains("GROUP BY", observer.Commands.Single(), StringComparison.OrdinalIgnoreCase);
@@ -178,9 +179,9 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
 
         var reports = Reports(database);
         var roomReport = await reports.GetRoomsAsync(At(0), At(0).AddDays(1), TestContext.Current.CancellationToken);
-        Assert.Equal(rooms.OrderBy(x => x.Id).Select(x => x.Id), roomReport.Items.Select(x => x.RoomId));
+        Assert.Equal(rooms.OrderBy(x => x.Id).Select(x => x.Id), roomReport.Value.Items.Select(x => x.RoomId));
         var serviceReport = await reports.GetServicesAsync(At(0), At(0).AddDays(1), TestContext.Current.CancellationToken);
-        Assert.Equal(rooms.Select(x => x.Name).Order(StringComparer.Ordinal), serviceReport.Items.Select(x => x.ServiceName));
+        Assert.Equal(rooms.Select(x => x.Name).Order(StringComparer.Ordinal), serviceReport.Value.Items.Select(x => x.ServiceName));
     }
 
     [Theory]
@@ -199,11 +200,11 @@ public sealed class ReportQueryTests(PostgresFixture postgres)
         await cancellation.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => query);
         Assert.Single(observer.Commands);
-        Assert.Empty((await Reports(database).GetRoomsAsync(At(0), At(0).AddDays(1), TestContext.Current.CancellationToken)).Items);
+        Assert.Empty((await Reports(database).GetRoomsAsync(At(0), At(0).AddDays(1), TestContext.Current.CancellationToken)).Value.Items);
     }
 
     private static ReportService Reports(TestDatabase database, params IInterceptor[] interceptors) =>
-        new(new ReportReader(new BookingContextFactory(database, interceptors)));
+        new(new ReportReader(new BookingContextFactory(database, interceptors), NullLogger<ReportReader>.Instance));
 }
 
 internal sealed class ReportReadObserver(string? failure = null, bool pause = false) : DbCommandInterceptor

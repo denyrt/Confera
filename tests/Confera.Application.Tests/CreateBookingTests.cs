@@ -16,7 +16,9 @@ public sealed class CreateBookingTests
         store.AfterRoomLock = () => clock.Now = At(10).AddTicks(9);
         var service = new CreateBookingService(store, clock);
 
-        var result = await service.CreateAsync(Command(store), TestContext.Current.CancellationToken);
+        var outcome = await service.CreateAsync(Command(store), TestContext.Current.CancellationToken);
+        Assert.True(outcome.IsSuccess);
+        var result = outcome.Value;
 
         Assert.True(store.Committed);
         Assert.True(store.Disposed);
@@ -42,10 +44,10 @@ public sealed class CreateBookingTests
             store.Room = null;
         }
 
-        var error = await Assert.ThrowsAsync<BookingOperationException>(() =>
-            Service(store).CreateAsync(command, TestContext.Current.CancellationToken));
+        var result = await Service(store).CreateAsync(command, TestContext.Current.CancellationToken);
 
-        Assert.Equal(missing ? BookingFailure.RoomNotFound : BookingFailure.RoomUnavailable, error.Failure);
+        Assert.False(result.IsSuccess);
+        Assert.IsType(missing ? typeof(BookingError.RoomNotFound) : typeof(BookingError.RoomUnavailable), result.Error);
         Assert.Null(store.Saved);
         Assert.False(store.Committed);
         Assert.True(store.Disposed);
@@ -58,10 +60,10 @@ public sealed class CreateBookingTests
         var clock = new TestClock(At(9));
         store.AfterRoomLock = () => clock.Now = At(11).AddTicks(10);
 
-        var error = await Assert.ThrowsAsync<BookingValidationException>(() =>
-            new CreateBookingService(store, clock).CreateAsync(Command(store), TestContext.Current.CancellationToken));
+        var result = await new CreateBookingService(store, clock).CreateAsync(Command(store), TestContext.Current.CancellationToken);
 
-        Assert.Equal(BookingValidationError.InvalidPeriod, error.Error);
+        var error = Assert.IsType<BookingError.InvalidPeriod>(result.Error);
+        Assert.Equal("Booking cannot start in the past.", error.Description);
         Assert.Null(store.Saved);
         Assert.True(store.Disposed);
     }
@@ -89,15 +91,14 @@ public sealed class CreateBookingTests
             _ => command with { ServiceIds = null! }
         };
 
-        if (scenario == "room")
+        var result = await Service(store).CreateAsync(command, TestContext.Current.CancellationToken);
+        var errorType = scenario switch
         {
-            var error = await Assert.ThrowsAsync<BookingOperationException>(() => Service(store).CreateAsync(command, TestContext.Current.CancellationToken));
-            Assert.Equal(BookingFailure.InvalidRequest, error.Failure);
-        }
-        else
-        {
-            await Assert.ThrowsAsync<BookingValidationException>(() => Service(store).CreateAsync(command, TestContext.Current.CancellationToken));
-        }
+            "room" => typeof(BookingError.InvalidRequest),
+            "period" or "utc" or "precision" => typeof(BookingError.InvalidPeriod),
+            _ => typeof(BookingError.InvalidServiceSelection)
+        };
+        Assert.IsType(errorType, result.Error);
 
         Assert.Equal(0, store.Begins);
     }
@@ -109,10 +110,9 @@ public sealed class CreateBookingTests
     {
         var store = new TestStore { FailSave = !failCommit, FailCommit = failCommit };
 
-        var error = await Assert.ThrowsAsync<BookingOperationException>(() =>
-            Service(store).CreateAsync(Command(store), TestContext.Current.CancellationToken));
+        var result = await Service(store).CreateAsync(Command(store), TestContext.Current.CancellationToken);
 
-        Assert.Equal(BookingFailure.PersistenceUnavailable, error.Failure);
+        Assert.IsType<BookingError.PersistenceUnavailable>(result.Error);
         Assert.False(store.Committed);
         Assert.True(store.Disposed);
         Assert.Equal(1, store.Begins);
@@ -145,8 +145,8 @@ public sealed class CreateBookingTests
             command = command with { ServiceIds = [Guid.NewGuid()] };
         }
 
-        var error = await Assert.ThrowsAsync<BookingValidationException>(() => Service(store).CreateAsync(command, TestContext.Current.CancellationToken));
-        Assert.Equal(missingCoverage ? BookingValidationError.MissingTariffCoverage : BookingValidationError.InvalidServiceSelection, error.Error);
+        var result = await Service(store).CreateAsync(command, TestContext.Current.CancellationToken);
+        Assert.IsType(missingCoverage ? typeof(BookingError.MissingTariffCoverage) : typeof(BookingError.InvalidServiceSelection), result.Error);
         Assert.Null(store.Saved);
         Assert.True(store.Disposed);
     }
@@ -161,6 +161,48 @@ public sealed class CreateBookingTests
     }
 
     private static CreateBookingService Service(TestStore store) => new(store, new TestClock(At(9)));
+
+    [Theory]
+    [InlineData("begin")]
+    [InlineData("dispose_after_commit")]
+    [InlineData("dispose_after_rejection")]
+    public async Task AcquisitionAndDisposalFailuresReturnUnavailableWithoutReplay(string stage)
+    {
+        var store = new TestStore
+        {
+            FailBegin = stage == "begin",
+            FailDispose = stage != "begin",
+            Overlap = stage == "dispose_after_rejection"
+        };
+
+        var result = await Service(store).CreateAsync(Command(store), TestContext.Current.CancellationToken);
+
+        Assert.IsType<BookingError.PersistenceUnavailable>(result.Error);
+        Assert.Equal(1, store.Begins);
+        Assert.Equal(stage != "begin", store.Disposed);
+        Assert.Equal(stage == "dispose_after_commit", store.Committed);
+        Assert.Equal(stage == "dispose_after_commit", store.Saved is not null);
+    }
+
+    [Fact]
+    public async Task CancellationDuringWorkDoesNotBecomeAnExpectedFailure()
+    {
+        var store = new TestStore();
+        using var cancellation = new CancellationTokenSource();
+        var failure = new BookingOperationException(BookingFailure.PersistenceUnavailable);
+        store.AfterRoomLock = () =>
+        {
+            cancellation.Cancel();
+            throw failure;
+        };
+
+        var error = await Assert.ThrowsAsync<BookingOperationException>(() =>
+            Service(store).CreateAsync(Command(store), cancellation.Token));
+
+        Assert.Same(failure, error);
+        Assert.True(store.Disposed);
+        Assert.Null(store.Saved);
+    }
 
     private static CreateBookingCommand Command(TestStore store) =>
         new(store.Room!.Id, At(11), At(15), store.Room.Services.Select(x => x.Id).ToArray());
@@ -189,6 +231,8 @@ public sealed class CreateBookingTests
         public bool Overlap { get; set; }
         public bool FailSave { get; set; }
         public bool FailCommit { get; set; }
+        public bool FailBegin { get; init; }
+        public bool FailDispose { get; init; }
         public int Begins { get; private set; }
         public Booking? Saved { get; private set; }
         public bool Committed { get; private set; }
@@ -197,6 +241,7 @@ public sealed class CreateBookingTests
         public Task<IBookingTransaction> BeginAsync(CancellationToken cancellationToken)
         {
             Begins++;
+            if (FailBegin) throw new BookingOperationException(BookingFailure.PersistenceUnavailable);
             return Task.FromResult<IBookingTransaction>(this);
         }
 
@@ -235,6 +280,7 @@ public sealed class CreateBookingTests
         public ValueTask DisposeAsync()
         {
             Disposed = true;
+            if (FailDispose) throw new BookingOperationException(BookingFailure.PersistenceUnavailable);
             return ValueTask.CompletedTask;
         }
 

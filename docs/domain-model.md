@@ -84,6 +84,21 @@ BookingValidation is shared Domain period/selection validation; expected
 BookingValidationException errors are distinct from configuration/invariant
 failures. There is no automatic write replay or persisted idempotency key.
 
+Application returns `Result<TValue, TError>` for booking, room, availability,
+and report outcomes, with `Result<RoomError>` for deletion. Each feature owns
+its error cases; they contain no HTTP or provider types. Controllers explicitly
+map them to the existing response contracts through the shared `ApiProblems`
+formatter. Request helpers use `Try...` conversion; automatic `[ApiController]`
+binding/model validation can still reject a request before the action runs.
+
+Known Domain validation and persistence exceptions are adapted around the full
+use case, including transaction disposal. Infrastructure recognizes provider
+failures and logs temporary failures with their original causes and request
+scope; Application does not duplicate these logs. Unexpected failures propagate
+to the global handler for a safe 500 response. Cancellation is not converted
+to an expected failure. Non-throwing Domain validation remains a separate
+follow-up in the [RF1 plan](plans/readability-refactoring-plan.md).
+
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.
 

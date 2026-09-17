@@ -1,3 +1,4 @@
+using Confera.Api.Errors;
 using Confera.Application.Bookings;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,6 +25,30 @@ public sealed class BookingsController(CreateBookingService service) : Controlle
         var result = await service.CreateAsync(new CreateBookingCommand(
             request.RoomId, request.Start.UtcDateTime, request.End.UtcDateTime, request.ServiceIds), cancellationToken);
 
-        return StatusCode(StatusCodes.Status201Created, result);
+        if (result.IsSuccess)
+        {
+            return StatusCode(StatusCodes.Status201Created, result.Value);
+        }
+
+        var (status, code, detail) = result.Error switch
+        {
+            BookingError.InvalidRequest =>
+                (400, "invalid_request", "Supply a nonempty room ID."),
+            BookingError.InvalidPeriod error =>
+                (400, "invalid_booking_period", error.Description),
+            BookingError.InvalidServiceSelection error =>
+                (400, "invalid_service_selection", error.Description),
+            BookingError.MissingTariffCoverage error =>
+                (400, "tariff_coverage_missing", error.Description),
+            BookingError.RoomNotFound =>
+                (404, "room_not_found", "The room was not found."),
+            BookingError.RoomUnavailable =>
+                (409, "room_unavailable", "The room is already booked for part of this period."),
+            BookingError.PersistenceUnavailable =>
+                (503, "booking_persistence_unavailable", "The booking result could not be confirmed. A failed response does not prove that no booking was saved."),
+            _ => throw new InvalidOperationException("The booking error has no HTTP mapping.")
+        };
+
+        return ApiProblems.Response(HttpContext, status, code, detail);
     }
 }

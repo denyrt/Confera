@@ -122,6 +122,32 @@ public sealed class RoomHttpTests(PostgresFixture postgres)
         Assert.Equal(room.Version, (await db.Rooms.SingleAsync(x => x.Id == room.Id, TestContext.Current.CancellationToken)).Version);
     }
 
+    [Theory]
+    [InlineData("unquoted", true, false, 400, "invalid_request")]
+    [InlineData(null, true, false, 400, "invalid_room_data")]
+    [InlineData(null, false, true, 409, "room_has_unfinished_bookings")]
+    [InlineData("\"unknown\"", false, true, 409, "room_has_unfinished_bookings")]
+    public async Task ParsingAndLifecycleKeepPrecedenceOverPreconditions(
+        string? header, bool invalidCapacity, bool hasBooking, int status, string code)
+    {
+        await using var database = await postgres.CreateDatabaseAsync();
+        var (room, _) = await SeedAsync(database);
+        if (hasBooking)
+        {
+            Assert.True((await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken)).IsSuccess);
+        }
+
+        await using var factory = new BookingApiFactory(database);
+        using var client = factory.CreateHttpsClient();
+        var payload = Payload();
+        payload["capacity"] = invalidCapacity ? 0 : 40;
+        using var response = await Send(client, HttpMethod.Put, $"/rooms/{room.Id}", payload, header);
+
+        await AssertProblemAsync(response, (HttpStatusCode)status, code);
+        await using var db = database.Context();
+        Assert.Equal(room.Version, (await db.Rooms.SingleAsync(x => x.Id == room.Id, TestContext.Current.CancellationToken)).Version);
+    }
+
     [Fact]
     public async Task ListsAndRepeatedHeadersUseStrongComparisonAndSupportEmptyServiceSet()
     {
@@ -214,7 +240,7 @@ public sealed class RoomHttpTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
         await using var db = database.Context();
         var saved = await db.Bookings.Include(x => x.Services).Include(x => x.PriceSegments).SingleAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(booking.TotalPrice, saved.TotalPrice);
+        Assert.Equal(booking.Value.TotalPrice, saved.TotalPrice);
         Assert.Equal(2000m, saved.HourlyRateSnapshot);
         Assert.Equal(new[] { "Projector", "Wi-Fi" }, saved.Services.Select(x => x.ServiceNameSnapshot).Order());
         Assert.Equal(8600m, saved.PriceSegments.Sum(x => x.Price));

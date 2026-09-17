@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -21,5 +22,23 @@ internal static class ApiProblems
         var response = new BadRequestObjectResult(problem);
         response.ContentTypes.Add("application/problem+json");
         return response;
+    }
+
+    internal static ObjectResult Response(HttpContext context, int status, string code, string detail)
+    {
+        // Preserve the response metadata previously supplied by exception middleware
+        // and its ProblemDetails writer for expected failures.
+        context.Response.Headers.CacheControl = "no-cache,no-store";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Expires = "-1";
+        context.Response.Headers.Remove("ETag");
+
+        var problem = Create(context, status, code, detail);
+        problem.Extensions["traceId"] = Activity.Current?.Id ?? context.TraceIdentifier;
+        return new ObjectResult(problem)
+        {
+            StatusCode = status,
+            ContentTypes = { "application/problem+json" }
+        };
     }
 }

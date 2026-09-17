@@ -6,6 +6,7 @@ using Confera.Domain.Rooms;
 using Confera.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 namespace Confera.Integration.Tests;
@@ -40,7 +41,7 @@ internal static class BookingTestSupport
         new(room.Id, At(11), At(15), room.Services.Select(x => x.Id).ToArray());
 
     internal static CreateBookingService Service(TestDatabase database, params IInterceptor[] interceptors) =>
-        new(new BookingStore(new BookingContextFactory(database, interceptors)), new BookingClock(At(9)));
+        new(new BookingStore(new BookingContextFactory(database, interceptors), NullLogger<BookingStore>.Instance), new BookingClock(At(9)));
 
     internal static async Task WaitForBlockedConnectionAsync(TestDatabase database, int pid, CancellationToken cancellationToken)
     {
