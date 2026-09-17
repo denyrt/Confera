@@ -47,6 +47,7 @@ alongside their corresponding application use cases.
 | A1 | Availability search | Done | [PR #10](https://github.com/denyrt/Confera/pull/10), merged as `85988e8` on 2026-09-16 and confirmed on fetched origin/main. GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](plans/a1-availability-search-plan.md#8-implementation-and-validation-record). |
 | H1 | Complete the five business API operations | Done | B1, R1, and A1 deliver all five core operations, plus the supporting room GET. A1's merge in PR #10 (`85988e8`) completes the operation set on main; HTTP/OpenAPI and all 290 tests passed. |
 | Q1 | Reports and assignment completion | Done | Both reports, snapshot aggregates, HTTP/OpenAPI, real-seed assignment path, and documentation merged in [PR #11](https://github.com/denyrt/Confera/pull/11) (`b7928a8`), 2026-09-17. Release build and all 320 tests passed. [Plan and evidence](plans/q1-reports-plan.md#9-implementation-and-validation-record). |
+| RF1 | Readability and explicit operation results | Planned | Design accepted on 2026-09-18. Documentation preparation and a local commit are authorized on feature/readability-refactoring; implementation awaits a separate instruction. [Plan and preparation record](plans/readability-refactoring-plan.md). |
 
 ### D1: Domain booking creation and tariff pricing
 
@@ -372,6 +373,44 @@ were not verified in this status update.
 
 Reports intentionally return all groups without pagination and do not promise
 a shared snapshot across separate requests.
+
+### RF1: Readability and explicit operation results
+
+The maintainer accepted the [refactoring plan](plans/readability-refactoring-plan.md)
+on 2026-09-18 and authorized a feature branch with documentation as its first
+changes and one local documentation commit. Production and test implementation
+requires a subsequent instruction. RF1 remains Planned; preparing the plan does
+not establish implementation progress or refactor acceptance.
+
+Agreed direction: a small Application-owned result type, feature-specific typed
+errors, explicit controller HTTP mapping, shared ProblemDetails formatting, and
+a global handler for unexpected failures. Begin with booking, then migrate room
+operations, availability, and reports. Known Domain/persistence exceptions may
+be adapted at the Application boundary during this stage. Automatic model
+validation and all existing public contracts remain unchanged. Non-throwing
+Domain validation is a later checkpoint, separate from boundary completion.
+
+Completion criteria:
+
+- Application exposes expected outcomes explicitly for all four feature areas;
+  controllers visibly choose HTTP responses, including request-parsing failures.
+- Expected errors leave the global handler while unexpected failures,
+  cancellation, and technical diagnostics retain their intended behavior.
+- Existing responses, OpenAPI, validation precedence, transaction/locking rules,
+  snapshots, and no-retry behavior remain compatible and pass relevant tests.
+- Current architecture documentation and actual validation evidence are updated;
+  later readability work and any scope revisions are recorded explicitly.
+
+Preparation began from fetched `origin/main` at `3f4c2f7`, which contains all
+completed business-operation prerequisites. Detailed preparation checks and the
+implementation authorization boundary are recorded in the plan. No RF1 runtime
+implementation or acceptance result is claimed by this documentation change.
+
+Preparation verified on 2026-09-18: Release build passed with zero warnings and
+errors; 109 local documentation links/anchors, 38 solution paths, all 17 Markdown
+registrations, solution-folder placement, and diff checks passed. Runtime tests
+were not run because the change is documentation-only. This evidence does not
+authorize implementation or change RF1's Planned status.
 
 ## Record each task result
 

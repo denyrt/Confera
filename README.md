@@ -45,6 +45,7 @@ The original requirements and project decisions are documented separately:
 - [Approved R1 room management and concurrency contract](docs/plans/r1-room-management-plan.md).
 - [A1 availability search contract, implementation plan, and validation](docs/plans/a1-availability-search-plan.md).
 - [Approved Q1 reports contract and implementation plan](docs/plans/q1-reports-plan.md).
+- [Approved readability refactoring plan; implementation awaits authorization](docs/plans/readability-refactoring-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/plans/p1-validation.md).
 

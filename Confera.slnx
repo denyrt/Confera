@@ -34,6 +34,7 @@
     <File Path="docs/plans/p1-validation.md" />
     <File Path="docs/plans/q1-reports-plan.md" />
     <File Path="docs/plans/r1-room-management-plan.md" />
+    <File Path="docs/plans/readability-refactoring-plan.md" />
   </Folder>
   <Folder Name="/orchestration/">
     <Project Path="orchestration/Confera.AppHost/Confera.AppHost.csproj" Id="a04f6849-ee0f-430f-8664-1020c1d969d3" />
