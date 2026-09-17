@@ -46,7 +46,7 @@ alongside their corresponding application use cases.
 | R1 | Room management and lifecycle restrictions | Done | [PR #9](https://github.com/denyrt/Confera/pull/9), merged as `5ce2eb6` on 2026-09-16 and confirmed on fetched origin/main. Room API, lifecycle guards and ETag/If-Match; Release build and all 225 tests passed on Windows. [Plan and evidence](plans/r1-room-management-plan.md#validation-record). |
 | A1 | Availability search | Done | [PR #10](https://github.com/denyrt/Confera/pull/10), merged as `85988e8` on 2026-09-16 and confirmed on fetched origin/main. GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](plans/a1-availability-search-plan.md#8-implementation-and-validation-record). |
 | H1 | Complete the five business API operations | Done | B1, R1, and A1 deliver all five core operations, plus the supporting room GET. A1's merge in PR #10 (`85988e8`) completes the operation set on main; HTTP/OpenAPI and all 290 tests passed. |
-| Q1 | Reports and assignment completion | In progress | [Approved plan](plans/q1-reports-plan.md), 2026-09-17. Branch and documentation preparation complete; implementation and acceptance follow. |
+| Q1 | Reports and assignment completion | Verified | Both reports, snapshot aggregates, HTTP/OpenAPI, real-seed assignment path, and documentation delivered locally on feature/booking-reports, 2026-09-17. Release build and all 320 tests passed; unmerged. [Plan and evidence](plans/q1-reports-plan.md#9-implementation-and-validation-record). |
 
 ### D1: Domain booking creation and tariff pricing
 
@@ -353,6 +353,24 @@ Completion criteria:
   assignment and decision docs; Q1 verifies their end-to-end use.
 - Documentation accurately describes the implemented scope and verified commands.
 - All relevant implemented test suites pass; limitations are explicitly recorded.
+
+Verified on 2026-09-17: both reports filter and aggregate recorded values in one
+parameterized PostgreSQL statement each. Tests verify period boundaries, exact
+decimal seconds and money, no join multiplication, full results, historical
+prices/deleted rooms, name grouping and sorting, safe failures and cancellation.
+The real demo seed -> search -> HTTP booking -> reports scenario produces
+8600 UAH rental + 800 UAH services = 9400 UAH. All 320 tests passed on Windows
+(111 Domain, 54 Application, 143 Integration, 12 AppHost), without skips. Tool
+and package restore, Release build with zero warnings/errors, EF model check,
+documentation links/solution folders, formatting and diff checks passed.
+See the [validation record](plans/q1-reports-plan.md#9-implementation-and-validation-record).
+
+The implementation remains local and unmerged. At the initial verification
+handoff, no hosted Linux CI run, commit, push, PR or merge had been performed.
+Reports intentionally return all groups without pagination and do not promise
+a shared snapshot across separate requests.
+After confirmed merge and relevant checks, record the merge reference and mark
+Q1 Done under CONTRIBUTING's final roadmap-update process.
 
 ## Record each task result
 

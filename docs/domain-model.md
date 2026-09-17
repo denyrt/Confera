@@ -5,7 +5,8 @@ scope. Intended behavior below does not imply that it is already implemented.
 
 ## Implemented foundation
 
-This section describes D1, P1 persistence, B1 booking, R1 room management, and A1 search.
+This section describes the Domain foundation used by persistence, booking,
+room management, availability search, and reports.
 
 | Model | Responsibility |
 | --- | --- |
@@ -62,11 +63,12 @@ not hold booking history. Creating a booking does not load or append to a room's
 history. Availability checks and saving the returned booking belong to the
 application and infrastructure layers.
 
-## Intended behavior and remaining work
+## Application behavior and persistence
 
 Snapshots keep confirmed booking prices independent of later changes to room
 rates, services, or pricing rules. Domain and real PostgreSQL round-trip tests
-verify this behavior. Reporting over snapshots remains Q1.
+verify this behavior. Q1 reports aggregate these snapshots in PostgreSQL without
+recalculating prices or loading booking histories into Domain aggregates.
 
 CreateBookingService coordinates booking validation, availability, and persistence.
 Infrastructure enforces a PostgreSQL exclusion constraint on room ID and the
@@ -113,9 +115,9 @@ by the database and compared with the `C` collation.
 
 ## API and application scope
 
-Expose the assignment's five operations: create, edit, and delete a room; search
-availability; and create a booking with its calculated price. Add two read-only
-report endpoints as described below. R1 also includes GET /rooms/{id}, explicitly
+The API exposes the assignment's five operations: create, edit, and delete a room;
+search availability; and create a booking with its calculated price. Q1 adds two
+read-only report endpoints as described below. R1 also includes GET /rooms/{id}, explicitly
 approved to obtain room state and ETag for conditional editing. The booking request uses start and end
 timestamps rather than the assignment's start and duration; both describe the
 same interval.
@@ -192,7 +194,13 @@ The approved [Q1 plan](plans/q1-reports-plan.md) specifies exact, case-sensitive
 snapshot-name grouping, so Projector and projector remain separate. Room rows
 exist only for rooms with selected bookings. Both reports return all groups
 without pagination, and total booked duration is decimal seconds preserving
-microsecond precision. These are approved target contracts, not delivery claims.
+microsecond precision. GET /reports/rooms and GET /reports/services each use one
+parameterized aggregate statement without write locks or an explicit transaction.
+Room values order descending, with room ID as the tie-breaker; service counts
+order descending, followed by exact name using PostgreSQL C collation. The
+Application reporting period requires ordered UTC microsecond instants, without
+booking duration or past-start restrictions. Separate requests can observe
+different committed states. See the roadmap for validation and merge status.
 The plan records alternative designs as optional future work requiring a new
 decision, not unfinished Q1 requirements.
 

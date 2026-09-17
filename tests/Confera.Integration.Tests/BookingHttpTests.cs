@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Confera.Application.Availability;
 using Confera.Application.Bookings;
+using Confera.Application.Reports;
 using Confera.Application.Rooms;
 using Confera.Domain.Rooms;
 using Confera.Infrastructure.Persistence;
@@ -328,6 +329,7 @@ internal sealed class BookingApiFactory(TestDatabase database, params IIntercept
                 services.AddScoped<IBookingStore>(_ => new BookingStore(new BookingContextFactory(database, interceptors)));
                 services.AddScoped<IRoomStore>(_ => new RoomStore(new BookingContextFactory(database, interceptors)));
                 services.AddScoped<IAvailabilityReader>(_ => new AvailabilityReader(new BookingContextFactory(database, interceptors)));
+                services.AddScoped<IReportReader>(_ => new ReportReader(new BookingContextFactory(database, interceptors)));
             }
         });
     }

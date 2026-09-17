@@ -5,7 +5,8 @@ and execution of the plan. Start with branch/documentation preparation, then
 implement and verify the reports. The [roadmap](../implementation-roadmap.md)
 records delivery status; this document records the contract and actual evidence.
 
-Status: In progress; branch and documentation preparation are complete.
+Status: Verified locally on 2026-09-17 on feature/booking-reports; not yet merged.
+The preparation record and final acceptance evidence are preserved below.
 
 Read with [CONTRIBUTING](../../CONTRIBUTING.md), the
 [agent workflow](../agent-workflow.md), [domain model](../domain-model.md), and
@@ -234,3 +235,67 @@ links/anchors, 37 solution paths, all 16 Markdown registrations and their soluti
 folders, and diff whitespace. Runtime tests were not run for this documentation
 stage; these checks are not report acceptance evidence. Implementation follows
 under the existing approval.
+
+## 9. Implementation and validation record
+
+Verified on 2026-09-17 on Windows with Docker Desktop Linux containers and
+PostgreSQL 18.6. The implementation is local on feature/booking-reports, based
+on origin/main d851fdc. No packages, Domain behavior, schema migrations, or
+existing write protocols changed.
+
+Delivered behavior:
+
+- ReportPeriod validates UTC microsecond endpoints independently of booking
+  duration/past-start constraints. ReportService uses one two-method reader.
+- Infrastructure uses two parameterized SQL queries through the existing EF
+  context. Explicit aggregates keep the query readable and avoid floating-point
+  duration conversion: PostgreSQL EXTRACT yields numeric seconds. Per-booking
+  child sums prevent join multiplication before room grouping. Only report rows
+  are materialized, with no row limit or query per room.
+- ReportsController exposes the agreed GET endpoints, shared strict timestamp
+  parsing, UTC/UAH envelopes, no-store, existing safe error mapping, and OpenAPI.
+- README, domain descriptions, local-development and HTTP examples now describe
+  the reports. Detailed P1/B1/R1/A1 plans and P1 evidence moved to docs/plans;
+  their content was verified unchanged apart from rebased links. Solution
+  Explorer registers the same nested folder, including this plan.
+
+| Check | Result |
+| --- | --- |
+| Tool and package restore | Passed; all package references were already current. |
+| Release build | Passed with zero warnings/errors. |
+| Domain suite | 111 passed; zero skipped. |
+| Application suite | 54 passed; zero skipped. |
+| PostgreSQL/HTTP integration suite | 143 passed; zero skipped. |
+| AppHost/worker suite | 12 passed; zero skipped. |
+| EF model consistency | No pending model changes. |
+| Documentation and solution | Local links/anchors, all 37 solution paths, and 16 Markdown registrations with matching solution folders verified. |
+| Diff and formatting | Full changed/new file review, moved-document preservation, C# formatting and whitespace checks passed. |
+
+All 320 tests passed. Q1 adds nine Application and 21 PostgreSQL/HTTP test cases.
+Coverage includes one-microsecond report windows, fractional-second duration,
+recorded rounding, full bookings crossing report boundaries, service-free
+bookings, retained deleted-room history, renamed/repriced offerings, exact names
+across rooms, deterministic ties, and 105 groups without implicit truncation.
+Interception verifies one parameterized read per report, safe failures without
+retry, and cancellation of an executing PostgreSQL query. The real DemoInitializer
+test checks all three rooms and the four seeded tariffs, then searches, books
+Room A via HTTP, and verifies both reports against the 9400 UAH example.
+
+The restore/build and four suite commands from section 5 were executed. Successful
+TRX reports were written under artifacts/tests/q1, with UTC filename timestamps 01:45:33
+(Application), 01:51:22 (Domain), 01:51:40 (Integration), and 01:54:43 (AppHost),
+dated 2026-09-17. Focused query/HTTP development runs also passed. The AppHost
+suite used the normal documented environment with DOCKER_HOST unset.
+
+The EF check used the existing design-time procedure:
+
+```powershell
+$env:ConnectionStrings__confera = 'Host=localhost;Database=design_time_only'
+dotnet ef migrations has-pending-model-changes --project src/Confera.Infrastructure --configuration Release --no-build
+```
+
+Q1 is Verified, not Done. At the initial verification handoff, no hosted Linux CI
+run, commit, push, PR creation, or merge had been performed. A confirmed merge
+and the final roadmap status update remain. Unbounded grouped responses and
+independently observed report requests are accepted limitations, and section 7's
+possible upgrades remain optional.

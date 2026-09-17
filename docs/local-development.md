@@ -17,8 +17,8 @@ dotnet run --project orchestration/Confera.AppHost --configuration Release --no-
 
 Open the dashboard URL printed by AppHost and use its API resource endpoint.
 The development API exposes `/health`, `/alive`, `/openapi/v1.json`, and Swagger
-UI at `/swagger`, with availability, booking, and room-management endpoints. Stop AppHost
-with Ctrl+C.
+UI at `/swagger`, with availability, booking, room-management and report endpoints.
+Stop AppHost with Ctrl+C.
 
 The default launch profile uses HTTPS and the local ASP.NET development
 certificate. Create and trust it explicitly on a clean SDK installation,
@@ -170,6 +170,45 @@ accepted; weak tags never match and wildcard * is rejected.
 GET responses use Cache-Control: no-store. No room restoration or automatic
 write replay is implemented. A lost response can follow a committed change.
 The [R1 contract](plans/r1-room-management-plan.md) lists the stable ProblemDetails codes.
+
+## Read booking reports
+
+After the Room A booking example, request both reports for the containing month:
+
+```http
+GET /reports/rooms?start=2030-01-01T00:00:00Z&end=2030-02-01T00:00:00Z
+GET /reports/services?start=2030-01-01T00:00:00Z&end=2030-02-01T00:00:00Z
+```
+
+With only that booking, the room report contains bookingCount 1,
+totalBookedSeconds 14400, rentalValue 8600, serviceValue 800 and totalValue 9400.
+The service report contains Projector (selectionCount 1, totalValue 500) and
+Wi-Fi (selectionCount 1, totalValue 300). Additional bookings starting within the
+period contribute to the same report. The response envelope contains start/end
+normalized to UTC, currency UAH and items; no matches returns 200 with empty items.
+
+Both endpoints select bookings by start in [start, end), then include each in
+full even if it ends beyond the reporting window. Bookings starting before the
+window are excluded, even when they overlap it. These are booking values, not
+payments. Past/future periods of any positive duration are accepted; input uses
+the same explicit-offset/microsecond format as booking/search. There is no
+tariff-coverage check for reports.
+
+Room rows group by ID and display the retained room name, including deleted-room
+history; rooms without selected bookings are omitted. rentalValue/serviceValue
+sum recorded prices, and totalValue is their sum. Decimal totalBookedSeconds
+preserves microseconds. Order is totalValue descending, then room ID ascending.
+Services group by exact recorded name across rooms: Projector and projector are
+separate, as are renamed offerings. Order is selectionCount descending, then
+exact serviceName ascending. Editing current prices/services never reprices history.
+
+Results include all groups without pagination or a row cap. Each report uses one
+database statement; separate requests may observe different committed states.
+Responses use Cache-Control: no-store. Missing/malformed input returns
+400 invalid_request; reversed/equal endpoints return 400 invalid_report_period;
+recognized temporary database failures return 503 report_persistence_unavailable;
+unexpected errors return safe 500 internal_error. See the
+[Q1 contract](plans/q1-reports-plan.md) and its explicitly optional future upgrades.
 
 ## Worker and demo initialization
 
