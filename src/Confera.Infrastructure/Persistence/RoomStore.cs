@@ -3,11 +3,13 @@ using Confera.Application.Rooms;
 using Confera.Domain.Rooms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Confera.Infrastructure.Persistence;
 
-public sealed class RoomStore(IDbContextFactory<ConferaDbContext> factory) : IRoomStore
+public sealed class RoomStore(
+    IDbContextFactory<ConferaDbContext> factory, ILogger<RoomStore> logger) : IRoomStore
 {
     public Task<Room?> GetAsync(Guid roomId, CancellationToken cancellationToken) =>
         TranslateErrorsAsync(async () =>
@@ -34,7 +36,7 @@ public sealed class RoomStore(IDbContextFactory<ConferaDbContext> factory) : IRo
             try
             {
                 var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-                return new RoomTransaction(db, transaction);
+                return new RoomTransaction(db, transaction, this);
             }
             catch
             {
@@ -43,22 +45,23 @@ public sealed class RoomStore(IDbContextFactory<ConferaDbContext> factory) : IRo
             }
         }, cancellationToken);
 
-    private sealed class RoomTransaction(ConferaDbContext db, IDbContextTransaction transaction) : IRoomTransaction
+    private sealed class RoomTransaction(
+        ConferaDbContext db, IDbContextTransaction transaction, RoomStore store) : IRoomTransaction
     {
         public Task<Room?> GetRoomForUpdateAsync(Guid roomId, CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => RoomQueries.LockAndLoadAsync(db, roomId, cancellationToken), cancellationToken);
+            store.TranslateErrorsAsync(() => RoomQueries.LockAndLoadAsync(db, roomId, cancellationToken), cancellationToken);
 
         public Task<bool> HasUnfinishedBookingsAsync(Guid roomId, DateTime nowUtc, CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => db.Bookings.AnyAsync(x => x.RoomId == roomId && x.EndsAtUtc > nowUtc,
+            store.TranslateErrorsAsync(() => db.Bookings.AnyAsync(x => x.RoomId == roomId && x.EndsAtUtc > nowUtc,
                 cancellationToken), cancellationToken);
 
         public Task SaveAsync(CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => db.SaveChangesAsync(cancellationToken), cancellationToken);
+            store.TranslateErrorsAsync(() => db.SaveChangesAsync(cancellationToken), cancellationToken);
 
         public Task CommitAsync(CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => transaction.CommitAsync(cancellationToken), cancellationToken);
+            store.TranslateErrorsAsync(() => transaction.CommitAsync(cancellationToken), cancellationToken);
 
-        public ValueTask DisposeAsync() => new(TranslateErrorsAsync(async () =>
+        public ValueTask DisposeAsync() => new(store.TranslateErrorsAsync(async () =>
         {
             try
             {
@@ -71,7 +74,7 @@ public sealed class RoomStore(IDbContextFactory<ConferaDbContext> factory) : IRo
         }, CancellationToken.None));
     }
 
-    private static async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
     {
         try
         {
@@ -79,11 +82,16 @@ public sealed class RoomStore(IDbContextFactory<ConferaDbContext> factory) : IRo
         }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested && TryGetFailure(error, out var failure))
         {
+            if (failure == RoomFailure.PersistenceUnavailable)
+            {
+                logger.LogError(error, "Room persistence is temporarily unavailable.");
+            }
+
             throw new RoomOperationException(failure, error);
         }
     }
 
-    private static Task TranslateErrorsAsync(Func<Task> action, CancellationToken cancellationToken) =>
+    private Task TranslateErrorsAsync(Func<Task> action, CancellationToken cancellationToken) =>
         TranslateErrorsAsync(async () =>
         {
             await action();

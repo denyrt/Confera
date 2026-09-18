@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using Confera.Api.Time;
-using Confera.Application.Reports;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
@@ -14,13 +13,17 @@ public sealed class ReportRequest
     [FromQuery(Name = "end"), Required, BindRequired]
     public string End { get; init; } = null!;
 
-    internal (DateTime Start, DateTime End) ToUtc()
+    internal bool TryGetUtcPeriod(out DateTime startsAtUtc, out DateTime endsAtUtc)
     {
+        startsAtUtc = default;
+        endsAtUtc = default;
         if (!ApiTimestamp.TryParse(Start, out var start) || !ApiTimestamp.TryParse(End, out var end))
         {
-            throw new ReportOperationException(ReportFailure.InvalidRequest);
+            return false;
         }
 
-        return (start.UtcDateTime, end.UtcDateTime);
+        startsAtUtc = start.UtcDateTime;
+        endsAtUtc = end.UtcDateTime;
+        return true;
     }
 }

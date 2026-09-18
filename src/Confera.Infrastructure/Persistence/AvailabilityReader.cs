@@ -2,10 +2,12 @@ using Confera.Application.Availability;
 using Confera.Application.Rooms;
 using Confera.Domain.Bookings;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Confera.Infrastructure.Persistence;
 
-public sealed class AvailabilityReader(IDbContextFactory<ConferaDbContext> factory) : IAvailabilityReader
+public sealed class AvailabilityReader(
+    IDbContextFactory<ConferaDbContext> factory, ILogger<AvailabilityReader> logger) : IAvailabilityReader
 {
     public Task<IReadOnlyList<BookingPricingRule>> GetPricingRulesAsync(CancellationToken cancellationToken) =>
         TranslateErrorsAsync<IReadOnlyList<BookingPricingRule>>(async () =>
@@ -32,7 +34,7 @@ public sealed class AvailabilityReader(IDbContextFactory<ConferaDbContext> facto
                 .ToListAsync(cancellationToken);
         }, cancellationToken);
 
-    private static async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
     {
         try
         {
@@ -41,6 +43,7 @@ public sealed class AvailabilityReader(IDbContextFactory<ConferaDbContext> facto
         catch (Exception error) when (!cancellationToken.IsCancellationRequested
             && PersistenceErrors.IsUnavailable(PersistenceErrors.Unwrap(error)))
         {
+            logger.LogError(error, "Availability persistence is temporarily unavailable.");
             throw new AvailabilityOperationException(AvailabilityFailure.PersistenceUnavailable, error);
         }
     }

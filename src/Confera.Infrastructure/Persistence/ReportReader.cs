@@ -1,9 +1,11 @@
 using Confera.Application.Reports;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Confera.Infrastructure.Persistence;
 
-public sealed class ReportReader(IDbContextFactory<ConferaDbContext> factory) : IReportReader
+public sealed class ReportReader(
+    IDbContextFactory<ConferaDbContext> factory, ILogger<ReportReader> logger) : IReportReader
 {
     public Task<IReadOnlyList<RoomReportRow>> GetRoomsAsync(ReportPeriod period, CancellationToken cancellationToken) =>
         TranslateErrorsAsync<IReadOnlyList<RoomReportRow>>(async () =>
@@ -47,7 +49,7 @@ public sealed class ReportReader(IDbContextFactory<ConferaDbContext> factory) : 
                 """).ToListAsync(cancellationToken);
         }, cancellationToken);
 
-    private static async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
     {
         try
         {
@@ -56,6 +58,7 @@ public sealed class ReportReader(IDbContextFactory<ConferaDbContext> factory) : 
         catch (Exception error) when (!cancellationToken.IsCancellationRequested
             && PersistenceErrors.IsUnavailable(PersistenceErrors.Unwrap(error)))
         {
+            logger.LogError(error, "Report persistence is temporarily unavailable.");
             throw new ReportOperationException(ReportFailure.PersistenceUnavailable, error);
         }
     }

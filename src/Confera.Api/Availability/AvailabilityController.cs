@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Confera.Api.Errors;
 using Confera.Application.Availability;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +26,28 @@ public sealed class AvailabilityController(SearchAvailabilityService service) : 
         [FromQuery, Range(1, AvailabilityQuery.MaximumPageSize)] int pageSize = 20)
     {
         Response.Headers.CacheControl = "no-store";
-        return Ok(await service.SearchAsync(request.ToQuery(page, pageSize), cancellationToken));
+        if (!request.TryToQuery(page, pageSize, out var query))
+        {
+            return ApiProblems.Response(HttpContext, 400, "invalid_request",
+                "Supply explicit-offset timestamps, a positive capacity and valid page/pageSize values.");
+        }
+
+        var result = await service.SearchAsync(query, cancellationToken);
+        if (result.IsSuccess)
+        {
+            return Ok(result.Value);
+        }
+
+        var (status, code, detail) = result.Error switch
+        {
+            AvailabilityError.InvalidRequest =>
+                (400, "invalid_request", "Supply explicit-offset timestamps, a positive capacity and valid page/pageSize values."),
+            AvailabilityError.InvalidPeriod error => (400, "invalid_booking_period", error.Description),
+            AvailabilityError.PersistenceUnavailable =>
+                (503, "availability_persistence_unavailable", "Availability search is temporarily unavailable."),
+            _ => throw new InvalidOperationException("The availability error has no HTTP mapping.")
+        };
+
+        return ApiProblems.Response(HttpContext, status, code, detail);
     }
 }

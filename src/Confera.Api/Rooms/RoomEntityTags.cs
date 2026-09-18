@@ -1,4 +1,3 @@
-using Confera.Application.Rooms;
 using Microsoft.Net.Http.Headers;
 
 namespace Confera.Api.Rooms;
@@ -8,17 +7,18 @@ internal static class RoomEntityTags
     // Change the format prefix if the selected JSON representation changes incompatibly.
     internal static string Format(Guid version) => $"\"room-v1-{version:N}\"";
 
-    internal static Guid[]? Parse(IHeaderDictionary headers)
+    internal static bool TryParse(IHeaderDictionary headers, out Guid[]? expectedVersions)
     {
+        expectedVersions = null;
         if (!headers.TryGetValue(HeaderNames.IfMatch, out var values))
         {
-            return null;
+            return true;
         }
 
         if (!EntityTagHeaderValue.TryParseStrictList(values.Select(x => x ?? string.Empty).ToArray(), out var tags) || tags.Count == 0
             || tags.Any(x => x == EntityTagHeaderValue.Any))
         {
-            throw new RoomOperationException(RoomFailure.InvalidRequest);
+            return false;
         }
 
         var versions = new List<Guid>();
@@ -38,6 +38,7 @@ internal static class RoomEntityTags
             }
         }
 
-        return versions.ToArray();
+        expectedVersions = versions.ToArray();
+        return true;
     }
 }

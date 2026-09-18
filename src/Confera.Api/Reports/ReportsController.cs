@@ -1,3 +1,4 @@
+using Confera.Api.Errors;
 using Confera.Application.Reports;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,8 +28,19 @@ public sealed class ReportsController(ReportService service) : ControllerBase
     public async Task<ActionResult<RoomReport>> GetRooms([FromQuery] ReportRequest request, CancellationToken cancellationToken)
     {
         Response.Headers.CacheControl = "no-store";
-        var (start, end) = request.ToUtc();
-        return Ok(await service.GetRoomsAsync(start, end, cancellationToken));
+        if (!request.TryGetUtcPeriod(out var start, out var end))
+        {
+            return ApiProblems.Response(HttpContext, 400, "invalid_request",
+                "Supply start and end with explicit-offset timestamps and whole-microsecond precision.");
+        }
+
+        var result = await service.GetRoomsAsync(start, end, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return MapFailure(result.Error);
+        }
+
+        return Ok(result.Value);
     }
 
     [HttpGet("services")]
@@ -41,7 +53,32 @@ public sealed class ReportsController(ReportService service) : ControllerBase
     public async Task<ActionResult<ServiceReport>> GetServices([FromQuery] ReportRequest request, CancellationToken cancellationToken)
     {
         Response.Headers.CacheControl = "no-store";
-        var (start, end) = request.ToUtc();
-        return Ok(await service.GetServicesAsync(start, end, cancellationToken));
+        if (!request.TryGetUtcPeriod(out var start, out var end))
+        {
+            return ApiProblems.Response(HttpContext, 400, "invalid_request",
+                "Supply start and end with explicit-offset timestamps and whole-microsecond precision.");
+        }
+
+        var result = await service.GetServicesAsync(start, end, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return MapFailure(result.Error);
+        }
+
+        return Ok(result.Value);
+    }
+
+    private ObjectResult MapFailure(ReportError error)
+    {
+        var (status, code, detail) = error switch
+        {
+            ReportError.InvalidPeriod =>
+                (400, "invalid_report_period", "Report endpoints must be UTC instants with whole-microsecond precision, and end must follow start."),
+            ReportError.PersistenceUnavailable =>
+                (503, "report_persistence_unavailable", "Reporting is temporarily unavailable."),
+            _ => throw new InvalidOperationException("The report error has no HTTP mapping.")
+        };
+
+        return ApiProblems.Response(HttpContext, status, code, detail);
     }
 }

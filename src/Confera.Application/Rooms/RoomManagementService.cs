@@ -1,3 +1,4 @@
+using Confera.Application.Common;
 using Confera.Domain;
 using Confera.Domain.Rooms;
 
@@ -7,80 +8,153 @@ public sealed record RoomCommand(string Name, int Capacity, decimal HourlyRate, 
 
 public sealed class RoomManagementService(IRoomStore store, TimeProvider timeProvider)
 {
-    public async Task<RoomState> CreateAsync(RoomCommand command, CancellationToken cancellationToken = default)
+    public async Task<Result<RoomState, RoomError>> CreateAsync(
+        RoomCommand command, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var room = new Room(Validate(command));
-        var result = RoomState.FromRoom(room);
-        await store.CreateAsync(room, cancellationToken);
-        return result;
+
+        try
+        {
+            var room = new Room(Validate(command));
+            var result = RoomState.FromRoom(room);
+            await store.CreateAsync(room, cancellationToken);
+            return Result<RoomState, RoomError>.Success(result);
+        }
+        catch (RoomValidationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result<RoomState, RoomError>.Failure(new RoomError.InvalidData(error.Message));
+        }
+        catch (RoomOperationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result<RoomState, RoomError>.Failure(MapPersistenceFailure(error));
+        }
     }
 
-    public async Task<RoomState> GetAsync(Guid roomId, CancellationToken cancellationToken = default)
+    public async Task<Result<RoomState, RoomError>> GetAsync(Guid roomId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        RequireRoomId(roomId);
-        var room = await store.GetAsync(roomId, cancellationToken);
-        RequireActiveRoom(room);
-        return RoomState.FromRoom(room!);
+        if (roomId == Guid.Empty)
+        {
+            return Result<RoomState, RoomError>.Failure(new RoomError.InvalidRequest());
+        }
+
+        try
+        {
+            var room = await store.GetAsync(roomId, cancellationToken);
+            if (room is null || room.IsDeleted)
+            {
+                return Result<RoomState, RoomError>.Failure(new RoomError.NotFound());
+            }
+
+            return Result<RoomState, RoomError>.Success(RoomState.FromRoom(room));
+        }
+        catch (RoomOperationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result<RoomState, RoomError>.Failure(MapPersistenceFailure(error));
+        }
     }
 
-    public async Task<RoomState> UpdateAsync(Guid roomId, RoomCommand command, IReadOnlyList<Guid>? expectedVersions,
+    public async Task<Result<RoomState, RoomError>> UpdateAsync(
+        Guid roomId, RoomCommand command, IReadOnlyList<Guid>? expectedVersions,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        RequireRoomId(roomId);
-        var details = Validate(command);
-        var versions = expectedVersions?.ToArray();
-
-        await using var transaction = await store.BeginAsync(cancellationToken);
-        var room = await transaction.GetRoomForUpdateAsync(roomId, cancellationToken);
-        RequireActiveRoom(room);
-
-        if (details.Capacity < room!.Capacity)
+        if (roomId == Guid.Empty)
         {
-            await RequireNoUnfinishedBookingsAsync(transaction, roomId, cancellationToken);
+            return Result<RoomState, RoomError>.Failure(new RoomError.InvalidRequest());
         }
 
-        RequireVersion(room, versions);
-        room.Update(details);
-        var result = RoomState.FromRoom(room);
-        await transaction.SaveAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return result;
+        try
+        {
+            var details = Validate(command);
+            var versions = expectedVersions?.ToArray();
+
+            await using var transaction = await store.BeginAsync(cancellationToken);
+            var room = await transaction.GetRoomForUpdateAsync(roomId, cancellationToken);
+            if (room is null || room.IsDeleted)
+            {
+                return Result<RoomState, RoomError>.Failure(new RoomError.NotFound());
+            }
+
+            if (details.Capacity < room.Capacity
+                && await HasUnfinishedBookingsAsync(transaction, roomId, cancellationToken))
+            {
+                return Result<RoomState, RoomError>.Failure(new RoomError.HasUnfinishedBookings());
+            }
+
+            if (CheckVersion(room, versions) is { } versionError)
+            {
+                return Result<RoomState, RoomError>.Failure(versionError);
+            }
+
+            room.Update(details);
+            var result = RoomState.FromRoom(room);
+            await transaction.SaveAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Result<RoomState, RoomError>.Success(result);
+        }
+        catch (RoomValidationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result<RoomState, RoomError>.Failure(new RoomError.InvalidData(error.Message));
+        }
+        catch (RoomOperationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result<RoomState, RoomError>.Failure(MapPersistenceFailure(error));
+        }
     }
 
-    public async Task DeleteAsync(Guid roomId, IReadOnlyList<Guid>? expectedVersions,
+    public async Task<Result<RoomError>> DeleteAsync(Guid roomId, IReadOnlyList<Guid>? expectedVersions,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        RequireRoomId(roomId);
-        var versions = expectedVersions?.ToArray();
-
-        await using var transaction = await store.BeginAsync(cancellationToken);
-        var room = await transaction.GetRoomForUpdateAsync(roomId, cancellationToken)
-            ?? throw new RoomOperationException(RoomFailure.NotFound);
-
-        // A repeated delete confirms the already reached state, even with the old version.
-        if (room.IsDeleted)
+        if (roomId == Guid.Empty)
         {
-            return;
+            return Result<RoomError>.Failure(new RoomError.InvalidRequest());
         }
 
-        await RequireNoUnfinishedBookingsAsync(transaction, roomId, cancellationToken);
-        RequireVersion(room, versions);
-        room.Delete();
-        await transaction.SaveAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        var versions = expectedVersions?.ToArray();
+
+        try
+        {
+            await using var transaction = await store.BeginAsync(cancellationToken);
+            var room = await transaction.GetRoomForUpdateAsync(roomId, cancellationToken);
+            if (room is null)
+            {
+                return Result<RoomError>.Failure(new RoomError.NotFound());
+            }
+
+            // A repeated delete confirms the already reached state, even with the old version.
+            if (room.IsDeleted)
+            {
+                return Result<RoomError>.Success();
+            }
+
+            if (await HasUnfinishedBookingsAsync(transaction, roomId, cancellationToken))
+            {
+                return Result<RoomError>.Failure(new RoomError.HasUnfinishedBookings());
+            }
+
+            if (CheckVersion(room, versions) is { } versionError)
+            {
+                return Result<RoomError>.Failure(versionError);
+            }
+
+            room.Delete();
+            await transaction.SaveAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Result<RoomError>.Success();
+        }
+        catch (RoomOperationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result<RoomError>.Failure(MapPersistenceFailure(error));
+        }
     }
 
-    private async Task RequireNoUnfinishedBookingsAsync(IRoomTransaction transaction, Guid roomId, CancellationToken cancellationToken)
+    private async Task<bool> HasUnfinishedBookingsAsync(
+        IRoomTransaction transaction, Guid roomId, CancellationToken cancellationToken)
     {
         var nowUtc = UtcPrecision.Floor(timeProvider.GetUtcNow().UtcDateTime);
-        if (await transaction.HasUnfinishedBookingsAsync(roomId, nowUtc, cancellationToken))
-        {
-            throw new RoomOperationException(RoomFailure.HasUnfinishedBookings);
-        }
+        return await transaction.HasUnfinishedBookingsAsync(roomId, nowUtc, cancellationToken);
     }
 
     private static RoomDetails Validate(RoomCommand command)
@@ -89,32 +163,21 @@ public sealed class RoomManagementService(IRoomStore store, TimeProvider timePro
         return new RoomDetails(command.Name, command.Capacity, command.HourlyRate, command.Services);
     }
 
-    private static void RequireRoomId(Guid roomId)
-    {
-        if (roomId == Guid.Empty)
-        {
-            throw new RoomOperationException(RoomFailure.InvalidRequest);
-        }
-    }
-
-    private static void RequireActiveRoom(Room? room)
-    {
-        if (room is null || room.IsDeleted)
-        {
-            throw new RoomOperationException(RoomFailure.NotFound);
-        }
-    }
-
-    private static void RequireVersion(Room room, Guid[]? versions)
+    private static RoomError? CheckVersion(Room room, Guid[]? versions)
     {
         if (versions is null)
         {
-            throw new RoomOperationException(RoomFailure.PreconditionRequired);
+            return new RoomError.PreconditionRequired();
         }
 
-        if (!versions.Contains(room.Version))
-        {
-            throw new RoomOperationException(RoomFailure.VersionMismatch);
-        }
+        return versions.Contains(room.Version) ? null : new RoomError.VersionMismatch();
     }
+
+    private static RoomError MapPersistenceFailure(RoomOperationException error) => error.Failure switch
+    {
+        RoomFailure.NameConflict => new RoomError.NameConflict(),
+        RoomFailure.VersionMismatch => new RoomError.VersionMismatch(),
+        RoomFailure.PersistenceUnavailable => new RoomError.PersistenceUnavailable(),
+        _ => throw new InvalidOperationException("Unknown room persistence failure.", error)
+    };
 }

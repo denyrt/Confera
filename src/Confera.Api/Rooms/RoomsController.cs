@@ -1,3 +1,4 @@
+using Confera.Api.Errors;
 using Confera.Application.Rooms;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,8 +20,18 @@ public sealed class RoomsController(RoomManagementService service) : ControllerB
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<RoomResult>> Create(RoomRequest request, CancellationToken cancellationToken)
     {
-        var state = await service.CreateAsync(request.ToCommand(), cancellationToken);
-        return CreatedAtAction(nameof(Get), new { id = state.Room.Id }, state.Room);
+        if (!request.TryToCommand(out var command))
+        {
+            return MapFailure(new RoomError.InvalidRequest());
+        }
+
+        var result = await service.CreateAsync(command, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return MapFailure(result.Error);
+        }
+
+        return CreatedAtAction(nameof(Get), new { id = result.Value.Room.Id }, result.Value.Room);
     }
 
     [HttpGet("{id}")]
@@ -32,9 +43,14 @@ public sealed class RoomsController(RoomManagementService service) : ControllerB
     public async Task<ActionResult<RoomResult>> Get(Guid id, CancellationToken cancellationToken)
     {
         Response.Headers.CacheControl = "no-store";
-        var state = await service.GetAsync(id, cancellationToken);
-        Response.Headers.ETag = RoomEntityTags.Format(state.Version);
-        return Ok(state.Room);
+        var result = await service.GetAsync(id, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return MapFailure(result.Error);
+        }
+
+        Response.Headers.ETag = RoomEntityTags.Format(result.Value.Version);
+        return Ok(result.Value.Room);
     }
 
     [HttpPut("{id}")]
@@ -54,9 +70,19 @@ public sealed class RoomsController(RoomManagementService service) : ControllerB
         [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken cancellationToken)
     {
         // Read raw values rather than the binder's first value to preserve repeated header fields.
-        var versions = RoomEntityTags.Parse(Request.Headers);
-        var state = await service.UpdateAsync(id, request.ToCommand(), versions, cancellationToken);
-        return Ok(state.Room);
+        if (!RoomEntityTags.TryParse(Request.Headers, out var versions)
+            || !request.TryToCommand(out var command))
+        {
+            return MapFailure(new RoomError.InvalidRequest());
+        }
+
+        var result = await service.UpdateAsync(id, command, versions, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return MapFailure(result.Error);
+        }
+
+        return Ok(result.Value.Room);
     }
 
     [HttpDelete("{id}")]
@@ -72,7 +98,41 @@ public sealed class RoomsController(RoomManagementService service) : ControllerB
     public async Task<IActionResult> Delete(Guid id, [FromHeader(Name = "If-Match")] string? ifMatch,
         CancellationToken cancellationToken)
     {
-        await service.DeleteAsync(id, RoomEntityTags.Parse(Request.Headers), cancellationToken);
+        if (!RoomEntityTags.TryParse(Request.Headers, out var versions))
+        {
+            return MapFailure(new RoomError.InvalidRequest());
+        }
+
+        var result = await service.DeleteAsync(id, versions, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return MapFailure(result.Error);
+        }
+
         return NoContent();
+    }
+
+    private ObjectResult MapFailure(RoomError error)
+    {
+        var (status, code, detail) = error switch
+        {
+            RoomError.InvalidRequest =>
+                (400, "invalid_request", "Supply a nonempty room ID and valid explicit entity tags in If-Match; wildcard * is not supported."),
+            RoomError.InvalidData invalid => (400, "invalid_room_data", invalid.Description),
+            RoomError.NotFound => (404, "room_not_found", "The room was not found."),
+            RoomError.NameConflict =>
+                (409, "room_name_conflict", "An active room already uses this name."),
+            RoomError.HasUnfinishedBookings =>
+                (409, "room_has_unfinished_bookings", "The room has ongoing or future bookings; capacity reduction and deletion are unavailable."),
+            RoomError.VersionMismatch =>
+                (412, "room_version_mismatch", "The room has changed. Read it again and review your changes before submitting the new ETag in If-Match."),
+            RoomError.PreconditionRequired =>
+                (428, "room_precondition_required", "Read the room and supply its ETag in the If-Match header."),
+            RoomError.PersistenceUnavailable =>
+                (503, "room_persistence_unavailable", "The room operation could not be confirmed. A failed response does not prove that no change was saved."),
+            _ => throw new InvalidOperationException("The room error has no HTTP mapping.")
+        };
+
+        return ApiProblems.Response(HttpContext, status, code, detail);
     }
 }

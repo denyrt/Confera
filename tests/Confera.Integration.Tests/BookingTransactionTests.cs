@@ -4,6 +4,7 @@ using Confera.Domain.Bookings;
 using Confera.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using static Confera.Integration.Tests.BookingTestSupport;
 
 namespace Confera.Integration.Tests;
@@ -16,11 +17,12 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         await using var database = await postgres.CreateDatabaseAsync();
         var (room, _) = await SeedAsync(database);
         var result = await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken);
+        Assert.True(result.IsSuccess);
 
         await using var db = database.Context();
         var saved = await db.Bookings.Include(x => x.PriceSegments).Include(x => x.Services)
             .SingleAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(result.BookingId, saved.Id);
+        Assert.Equal(result.Value.BookingId, saved.Id);
         Assert.Equal(room.Id, saved.RoomId);
         Assert.Equal(At(9), saved.CreatedAtUtc);
         Assert.Equal(9400m, saved.TotalPrice);
@@ -56,28 +58,19 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         Assert.Equal(2, barrier.ConnectionIds.Distinct().Count());
         if (scenario == "overlap")
         {
-            Assert.Single(results, x => x is null);
-            Assert.Single(results, x => x == BookingFailure.RoomUnavailable);
+            Assert.Single(results, x => x.IsSuccess);
+            var rejected = Assert.Single(results, x => !x.IsSuccess);
+            Assert.IsType<BookingError.RoomUnavailable>(rejected.Error);
         }
         else
         {
-            Assert.All(results, Assert.Null);
+            Assert.All(results, result => Assert.True(result.IsSuccess));
         }
 
         Assert.Equal(scenario == "overlap" ? 1L : 2L, await database.ScalarAsync<long>("SELECT count(*) FROM \"Bookings\""));
 
-        async Task<BookingFailure?> Attempt(CreateBookingCommand command)
-        {
-            try
-            {
-                await service.CreateAsync(command, timeout.Token);
-                return null;
-            }
-            catch (BookingOperationException error)
-            {
-                return error.Failure;
-            }
-        }
+        Task<Confera.Application.Common.Result<BookingResult, BookingError>> Attempt(CreateBookingCommand command) =>
+            service.CreateAsync(command, timeout.Token);
     }
 
     [Theory]
@@ -115,7 +108,7 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         await edit.SaveChangesAsync(timeout.Token);
         var observer = new RoomLockObserver();
         var clock = new BookingClock(At(9));
-        var service = new CreateBookingService(new BookingStore(new BookingContextFactory(database, observer)), clock);
+        var service = new CreateBookingService(new BookingStore(new BookingContextFactory(database, observer), NullLogger<BookingStore>.Instance), clock);
         var attempt = service.CreateAsync(Command(room), timeout.Token);
         var pid = await observer.Started.Task.WaitAsync(timeout.Token);
         await WaitForBlockedConnectionAsync(database, pid, timeout.Token);
@@ -127,18 +120,17 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         await editTransaction.CommitAsync(timeout.Token);
         if (change == "deleted")
         {
-            var error = await Assert.ThrowsAsync<BookingOperationException>(() => attempt);
-            Assert.Equal(BookingFailure.RoomNotFound, error.Failure);
+            Assert.IsType<BookingError.RoomNotFound>((await attempt).Error);
         }
         else if (change is "service_removed" or "clock")
         {
-            var error = await Assert.ThrowsAsync<BookingValidationException>(() => attempt);
-            Assert.Equal(change == "clock" ? BookingValidationError.InvalidPeriod : BookingValidationError.InvalidServiceSelection, error.Error);
+            Assert.IsType(change == "clock" ? typeof(BookingError.InvalidPeriod) : typeof(BookingError.InvalidServiceSelection),
+                (await attempt).Error);
         }
         else
         {
             var result = await attempt;
-            Assert.Equal(change == "rate" ? 13700m : 9800m, result.TotalPrice);
+            Assert.Equal(change == "rate" ? 13700m : 9800m, result.Value.TotalPrice);
         }
 
         Assert.Equal(change is "rate" or "service_price" ? 1L : 0L,
@@ -159,7 +151,7 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         Assert.Equal(0L, await database.ScalarAsync<long>("SELECT count(*) FROM \"BookingPriceSegments\""));
         Assert.Equal(0L, await database.ScalarAsync<long>("SELECT count(*) FROM \"BookedRoomServiceSnapshots\""));
         var retryByCaller = await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken);
-        Assert.Equal(9400m, retryByCaller.TotalPrice);
+        Assert.Equal(9400m, retryByCaller.Value.TotalPrice);
     }
 
     [Fact]
@@ -168,7 +160,7 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         await using var database = await postgres.CreateDatabaseAsync();
         var (room, _) = await SeedAsync(database);
         var existing = await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken);
-        var store = new BookingStore(new BookingContextFactory(database));
+        var store = new BookingStore(new BookingContextFactory(database), NullLogger<BookingStore>.Instance);
         await using (var transaction = await store.BeginAsync(TestContext.Current.CancellationToken))
         {
             var loaded = await transaction.GetRoomForUpdateAsync(room.Id, TestContext.Current.CancellationToken);
@@ -179,7 +171,7 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         }
 
         await using var db = database.Context();
-        Assert.Equal(existing.BookingId, (await db.Bookings.SingleAsync(TestContext.Current.CancellationToken)).Id);
+        Assert.Equal(existing.Value.BookingId, (await db.Bookings.SingleAsync(TestContext.Current.CancellationToken)).Id);
         Assert.Equal(3L, await database.ScalarAsync<long>("SELECT count(*) FROM \"BookingPriceSegments\""));
         Assert.Equal(2L, await database.ScalarAsync<long>("SELECT count(*) FROM \"BookedRoomServiceSnapshots\""));
     }
@@ -205,7 +197,7 @@ public sealed class BookingTransactionTests(PostgresFixture postgres)
         Assert.Equal(0L, await database.ScalarAsync<long>("SELECT count(*) FROM \"Bookings\""));
         await heldTransaction.CommitAsync(timeout.Token);
         var next = await Service(database).CreateAsync(Command(room), timeout.Token);
-        Assert.Equal(9400m, next.TotalPrice);
+        Assert.Equal(9400m, next.Value.TotalPrice);
     }
 
     private sealed class FailBeforeCommit : DbTransactionInterceptor

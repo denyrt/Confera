@@ -37,9 +37,15 @@ public sealed class SearchAvailabilityTests
             _ => Query() with { StartsAtUtc = DateTime.SpecifyKind(At(11), DateTimeKind.Unspecified) }
         };
 
-        var error = await Record.ExceptionAsync(() => Service(reader).SearchAsync(query, TestContext.Current.CancellationToken));
-        Assert.True(error is AvailabilityOperationException { Failure: AvailabilityFailure.InvalidRequest }
-            or BookingValidationException { Error: BookingValidationError.InvalidPeriod });
+        var result = await Service(reader).SearchAsync(query, TestContext.Current.CancellationToken);
+        if (scenario is "capacity" or "page" or "page_size_zero" or "page_size_large" or "overflow")
+        {
+            Assert.IsType<AvailabilityError.InvalidRequest>(result.Error);
+        }
+        else
+        {
+            Assert.IsType<AvailabilityError.InvalidPeriod>(result.Error);
+        }
         Assert.Equal(0, reader.TariffReads);
         Assert.Equal(0, reader.RoomReads);
     }
@@ -56,8 +62,9 @@ public sealed class SearchAvailabilityTests
             .Select(i => new RoomResult(Guid.NewGuid(), $"Room {i}", 50, 2000m, "UAH", [])).ToArray()
         };
         var clock = new TestClock(At(11).AddTicks(9));
-        var page = await new SearchAvailabilityService(reader, clock).SearchAsync(Query() with { Page = 3, PageSize = 2 },
+        var result = await new SearchAvailabilityService(reader, clock).SearchAsync(Query() with { Page = 3, PageSize = 2 },
             TestContext.Current.CancellationToken);
+        var page = result.Value;
 
         Assert.Equal(reader.Rooms.Take(2), page.Items);
         Assert.Equal((3, 2, hasNextPage), (page.Page, page.PageSize, page.HasNextPage));
@@ -70,7 +77,8 @@ public sealed class SearchAvailabilityTests
     public async Task MissingCoverageSkipsRoomReadAndPreservesPage()
     {
         var reader = new TestReader { Rules = [] };
-        var page = await Service(reader).SearchAsync(Query() with { Page = 7 }, TestContext.Current.CancellationToken);
+        var result = await Service(reader).SearchAsync(Query() with { Page = 7 }, TestContext.Current.CancellationToken);
+        var page = result.Value;
         Assert.Empty(page.Items);
         Assert.Equal((7, 20, false), (page.Page, page.PageSize, page.HasNextPage));
         Assert.Equal(1, reader.TariffReads);
@@ -89,12 +97,11 @@ public sealed class SearchAvailabilityTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FailureAtEitherReadPropagatesWithoutRetry(bool failRooms)
+    public async Task FailureAtEitherReadReturnsErrorWithoutRetry(bool failRooms)
     {
         var reader = new TestReader { FailTariffs = !failRooms, FailRooms = failRooms };
-        var error = await Assert.ThrowsAsync<AvailabilityOperationException>(() =>
-            Service(reader).SearchAsync(Query(), TestContext.Current.CancellationToken));
-        Assert.Equal(AvailabilityFailure.PersistenceUnavailable, error.Failure);
+        var result = await Service(reader).SearchAsync(Query(), TestContext.Current.CancellationToken);
+        Assert.IsType<AvailabilityError.PersistenceUnavailable>(result.Error);
         Assert.Equal(1, reader.TariffReads);
         Assert.Equal(failRooms ? 1 : 0, reader.RoomReads);
     }
@@ -104,7 +111,7 @@ public sealed class SearchAvailabilityTests
     {
         var reader = new TestReader();
         using var source = new CancellationTokenSource();
-        await Service(reader).SearchAsync(Query(), source.Token);
+        Assert.True((await Service(reader).SearchAsync(Query(), source.Token)).IsSuccess);
         Assert.Equal(new[] { source.Token, source.Token }, reader.Tokens);
         await source.CancelAsync();
         await Assert.ThrowsAsync<OperationCanceledException>(() => Service(reader).SearchAsync(Query(), source.Token));

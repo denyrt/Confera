@@ -4,11 +4,13 @@ using Confera.Domain.Bookings;
 using Confera.Domain.Rooms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace Confera.Infrastructure.Persistence;
 
-public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : IBookingStore
+public sealed class BookingStore(
+    IDbContextFactory<ConferaDbContext> factory, ILogger<BookingStore> logger) : IBookingStore
 {
     public Task<IBookingTransaction> BeginAsync(CancellationToken cancellationToken) =>
         TranslateErrorsAsync<IBookingTransaction>(async () =>
@@ -17,7 +19,7 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
             try
             {
                 var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-                return new BookingTransaction(db, transaction);
+                return new BookingTransaction(db, transaction, this);
             }
             catch
             {
@@ -26,31 +28,32 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
             }
         }, cancellationToken);
 
-    private sealed class BookingTransaction(ConferaDbContext db, IDbContextTransaction transaction) : IBookingTransaction
+    private sealed class BookingTransaction(
+        ConferaDbContext db, IDbContextTransaction transaction, BookingStore store) : IBookingTransaction
     {
         public Task<Room?> GetRoomForUpdateAsync(Guid roomId, CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => RoomQueries.LockAndLoadAsync(db, roomId, cancellationToken), cancellationToken);
+            store.TranslateErrorsAsync(() => RoomQueries.LockAndLoadAsync(db, roomId, cancellationToken), cancellationToken);
 
         public Task<IReadOnlyList<BookingPricingRule>> GetPricingRulesAsync(CancellationToken cancellationToken) =>
-            TranslateErrorsAsync<IReadOnlyList<BookingPricingRule>>(async () =>
+            store.TranslateErrorsAsync<IReadOnlyList<BookingPricingRule>>(async () =>
                 await db.PricingRules.AsNoTracking().ToListAsync(cancellationToken), cancellationToken);
 
         public Task<bool> HasOverlapAsync(Guid roomId, DateTime startsAtUtc, DateTime endsAtUtc, CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => db.Bookings.AnyAsync(
+            store.TranslateErrorsAsync(() => db.Bookings.AnyAsync(
                 x => x.RoomId == roomId && x.StartsAtUtc < endsAtUtc && x.EndsAtUtc > startsAtUtc,
                 cancellationToken), cancellationToken);
 
         public Task SaveAsync(Booking booking, CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(async () =>
+            store.TranslateErrorsAsync(async () =>
             {
                 db.Bookings.Add(booking);
                 await db.SaveChangesAsync(cancellationToken);
             }, cancellationToken);
 
         public Task CommitAsync(CancellationToken cancellationToken) =>
-            TranslateErrorsAsync(() => transaction.CommitAsync(cancellationToken), cancellationToken);
+            store.TranslateErrorsAsync(() => transaction.CommitAsync(cancellationToken), cancellationToken);
 
-        public ValueTask DisposeAsync() => new(TranslateErrorsAsync(async () =>
+        public ValueTask DisposeAsync() => new(store.TranslateErrorsAsync(async () =>
         {
             try
             {
@@ -64,7 +67,7 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
     }
 
     // Error translation is the only shared wrapper: no retries or transaction replay.
-    private static async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
     {
         try
         {
@@ -72,11 +75,16 @@ public sealed class BookingStore(IDbContextFactory<ConferaDbContext> factory) : 
         }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested && TryGetFailure(error, out var failure))
         {
+            if (failure == BookingFailure.PersistenceUnavailable)
+            {
+                logger.LogError(error, "Booking persistence is temporarily unavailable.");
+            }
+
             throw new BookingOperationException(failure, error);
         }
     }
 
-    private static Task TranslateErrorsAsync(Func<Task> action, CancellationToken cancellationToken) =>
+    private Task TranslateErrorsAsync(Func<Task> action, CancellationToken cancellationToken) =>
         TranslateErrorsAsync(async () =>
         {
             await action();

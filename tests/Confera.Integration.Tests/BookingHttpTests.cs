@@ -13,6 +13,7 @@ using Confera.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -326,10 +327,10 @@ internal sealed class BookingApiFactory(TestDatabase database, params IIntercept
             services.AddSingleton<TimeProvider>(new BookingClock(BookingTestSupport.At(9)));
             if (interceptors.Length > 0)
             {
-                services.AddScoped<IBookingStore>(_ => new BookingStore(new BookingContextFactory(database, interceptors)));
-                services.AddScoped<IRoomStore>(_ => new RoomStore(new BookingContextFactory(database, interceptors)));
-                services.AddScoped<IAvailabilityReader>(_ => new AvailabilityReader(new BookingContextFactory(database, interceptors)));
-                services.AddScoped<IReportReader>(_ => new ReportReader(new BookingContextFactory(database, interceptors)));
+                services.AddScoped<IBookingStore>(provider => new BookingStore(new BookingContextFactory(database, interceptors), provider.GetRequiredService<ILogger<BookingStore>>()));
+                services.AddScoped<IRoomStore>(provider => new RoomStore(new BookingContextFactory(database, interceptors), provider.GetRequiredService<ILogger<RoomStore>>()));
+                services.AddScoped<IAvailabilityReader>(provider => new AvailabilityReader(new BookingContextFactory(database, interceptors), provider.GetRequiredService<ILogger<AvailabilityReader>>()));
+                services.AddScoped<IReportReader>(provider => new ReportReader(new BookingContextFactory(database, interceptors), provider.GetRequiredService<ILogger<ReportReader>>()));
             }
         });
     }

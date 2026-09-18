@@ -1,3 +1,4 @@
+using Confera.Application.Common;
 using Confera.Domain;
 using Confera.Domain.Bookings;
 
@@ -11,14 +12,45 @@ public sealed record CreateBookingCommand(
 
 public sealed class CreateBookingService(IBookingStore store, TimeProvider timeProvider)
 {
-    public async Task<BookingResult> CreateAsync(CreateBookingCommand command, CancellationToken cancellationToken = default)
+    public async Task<Result<BookingResult, BookingError>> CreateAsync(
+        CreateBookingCommand command, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
 
+        try
+        {
+            return await CreateCoreAsync(command, cancellationToken);
+        }
+        catch (BookingValidationException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            BookingError failure = error.Error switch
+            {
+                BookingValidationError.InvalidPeriod => new BookingError.InvalidPeriod(error.Message),
+                BookingValidationError.InvalidServiceSelection => new BookingError.InvalidServiceSelection(error.Message),
+                BookingValidationError.MissingTariffCoverage => new BookingError.MissingTariffCoverage(error.Message),
+                _ => throw new InvalidOperationException("Unknown booking validation failure.", error)
+            };
+            return Result<BookingResult, BookingError>.Failure(failure);
+        }
+        catch (BookingOperationException error) when (!cancellationToken.IsCancellationRequested
+            && error.Failure == BookingFailure.RoomUnavailable)
+        {
+            return Result<BookingResult, BookingError>.Failure(new BookingError.RoomUnavailable());
+        }
+        catch (BookingOperationException error) when (!cancellationToken.IsCancellationRequested
+            && error.Failure == BookingFailure.PersistenceUnavailable)
+        {
+            return Result<BookingResult, BookingError>.Failure(new BookingError.PersistenceUnavailable());
+        }
+    }
+
+    private async Task<Result<BookingResult, BookingError>> CreateCoreAsync(
+        CreateBookingCommand command, CancellationToken cancellationToken)
+    {
         if (command.RoomId == Guid.Empty)
         {
-            throw new BookingOperationException(BookingFailure.InvalidRequest);
+            return Result<BookingResult, BookingError>.Failure(new BookingError.InvalidRequest());
         }
 
         var rentalPeriod = RentalPeriod.Create(command.StartsAtUtc, command.EndsAtUtc);
@@ -31,7 +63,7 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
         var room = await transaction.GetRoomForUpdateAsync(command.RoomId, cancellationToken);
         if (room is null || room.IsDeleted)
         {
-            throw new BookingOperationException(BookingFailure.RoomNotFound);
+            return Result<BookingResult, BookingError>.Failure(new BookingError.RoomNotFound());
         }
 
         var rules = await transaction.GetPricingRulesAsync(cancellationToken);
@@ -41,7 +73,7 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
 
         if (await transaction.HasOverlapAsync(room.Id, command.StartsAtUtc, command.EndsAtUtc, cancellationToken))
         {
-            throw new BookingOperationException(BookingFailure.RoomUnavailable);
+            return Result<BookingResult, BookingError>.Failure(new BookingError.RoomUnavailable());
         }
 
         var booking = room.Book(rentalPeriod, nowUtc, serviceIds, rules);
@@ -49,6 +81,6 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
         var result = BookingResult.FromBooking(booking);
         await transaction.SaveAsync(booking, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return result;
+        return Result<BookingResult, BookingError>.Success(result);
     }
 }

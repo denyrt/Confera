@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using Confera.Application.Rooms;
 using Confera.Domain.Rooms;
 
@@ -13,14 +14,16 @@ public sealed class RoomRequest
     [Required]
     public required RoomServiceRequest[] Services { get; init; }
 
-    internal RoomCommand ToCommand()
+    internal bool TryToCommand([NotNullWhen(true)] out RoomCommand? command)
     {
+        command = null;
         if (Services.Any(x => x is null))
         {
-            throw new RoomOperationException(RoomFailure.InvalidRequest);
+            return false;
         }
 
-        return new RoomCommand(Name, Capacity, HourlyRate, Services.Select(x => new RoomServiceData(x.Name, x.Price)).ToArray());
+        command = new RoomCommand(Name, Capacity, HourlyRate, Services.Select(x => new RoomServiceData(x.Name, x.Price)).ToArray());
+        return true;
     }
 }
 

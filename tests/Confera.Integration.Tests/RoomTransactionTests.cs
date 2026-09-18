@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Logging.Abstractions;
 using static Confera.Integration.Tests.BookingTestSupport;
 
 namespace Confera.Integration.Tests;
@@ -47,15 +48,15 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
 
         if (bookingFirst && change is "delete" or "capacity")
         {
-            Assert.Equal(RoomFailure.HasUnfinishedBookings, Assert.IsType<RoomOperationException>(failure).Failure);
+            Assert.IsType<RoomError.HasUnfinishedBookings>(failure);
         }
         else if (!bookingFirst && change == "delete")
         {
-            Assert.Equal(BookingFailure.RoomNotFound, Assert.IsType<BookingOperationException>(failure).Failure);
+            Assert.IsType<BookingError.RoomNotFound>(failure);
         }
         else if (!bookingFirst && change == "services")
         {
-            Assert.Equal(BookingValidationError.InvalidServiceSelection, Assert.IsType<BookingValidationException>(failure).Error);
+            Assert.IsType<BookingError.InvalidServiceSelection>(failure);
         }
         else
         {
@@ -79,25 +80,22 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
         Assert.Equal(!bookingFirst && change == "delete", savedRoom.IsDeleted);
         Assert.Equal(!bookingFirst && change == "capacity" ? 40 : 50, savedRoom.Capacity);
 
-        async Task<Exception?> Book()
+        async Task<object?> Book()
         {
-            try
-            {
-                await bookings.CreateAsync(Command(room), timeout.Token);
-                return null;
-            }
-            catch (Exception error) when (error is BookingOperationException or BookingValidationException) { return error; }
+            var result = await bookings.CreateAsync(Command(room), timeout.Token);
+            return result.IsSuccess ? null : result.Error;
         }
 
-        async Task<Exception?> Edit()
+        async Task<object?> Edit()
         {
-            try
+            if (change == "delete")
             {
-                if (change == "delete") await rooms.DeleteAsync(room.Id, [room.Version], timeout.Token);
-                else await rooms.UpdateAsync(room.Id, edit, [room.Version], timeout.Token);
-                return null;
+                var deletion = await rooms.DeleteAsync(room.Id, [room.Version], timeout.Token);
+                return deletion.IsSuccess ? null : deletion.Error;
             }
-            catch (RoomOperationException error) { return error; }
+
+            var update = await rooms.UpdateAsync(room.Id, edit, [room.Version], timeout.Token);
+            return update.IsSuccess ? null : update.Error;
         }
     }
 
@@ -110,20 +108,20 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
     {
         await using var database = await postgres.CreateDatabaseAsync();
         var (room, _) = await SeedAsync(database);
-        await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken);
-        var rooms = new RoomManagementService(new RoomStore(new BookingContextFactory(database)), new BookingClock(At(nowHour)));
+        Assert.True((await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken)).IsSuccess);
+        var rooms = new RoomManagementService(new RoomStore(new BookingContextFactory(database), NullLogger<RoomStore>.Instance), new BookingClock(At(nowHour)));
         if (allowed)
         {
             var updated = await rooms.UpdateAsync(room.Id, Details(room) with { Capacity = 40 }, [room.Version], TestContext.Current.CancellationToken);
-            await rooms.DeleteAsync(room.Id, [updated.Version], TestContext.Current.CancellationToken);
+            Assert.True((await rooms.DeleteAsync(room.Id, [updated.Value.Version], TestContext.Current.CancellationToken)).IsSuccess);
         }
         else
         {
-            var edit = await Assert.ThrowsAsync<RoomOperationException>(() => rooms.UpdateAsync(room.Id,
-                Details(room) with { Capacity = 40 }, [room.Version], TestContext.Current.CancellationToken));
-            var delete = await Assert.ThrowsAsync<RoomOperationException>(() => rooms.DeleteAsync(room.Id, [room.Version], TestContext.Current.CancellationToken));
-            Assert.Equal(RoomFailure.HasUnfinishedBookings, edit.Failure);
-            Assert.Equal(RoomFailure.HasUnfinishedBookings, delete.Failure);
+            var edit = await rooms.UpdateAsync(room.Id,
+                Details(room) with { Capacity = 40 }, [room.Version], TestContext.Current.CancellationToken);
+            var delete = await rooms.DeleteAsync(room.Id, [room.Version], TestContext.Current.CancellationToken);
+            Assert.IsType<RoomError.HasUnfinishedBookings>(edit.Error);
+            Assert.IsType<RoomError.HasUnfinishedBookings>(delete.Error);
         }
 
         await using var db = database.Context();
@@ -136,7 +134,7 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
     {
         await using var database = await postgres.CreateDatabaseAsync();
         var (room, _) = await SeedAsync(database);
-        await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken);
+        Assert.True((await Service(database).CreateAsync(Command(room), TestContext.Current.CancellationToken)).IsSuccess);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         await using var holder = database.Context();
@@ -144,12 +142,12 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
         await holder.Database.ExecuteSqlInterpolatedAsync($"""SELECT "Id" FROM "Rooms" WHERE "Id" = {room.Id} FOR UPDATE""", timeout.Token);
         var observer = new RoomLockObserver();
         var clock = new BookingClock(At(14));
-        var rooms = new RoomManagementService(new RoomStore(new BookingContextFactory(database, observer)), clock);
+        var rooms = new RoomManagementService(new RoomStore(new BookingContextFactory(database, observer), NullLogger<RoomStore>.Instance), clock);
         var attempt = rooms.DeleteAsync(room.Id, [room.Version], timeout.Token);
         await WaitForBlockedConnectionAsync(database, await observer.Started.Task.WaitAsync(timeout.Token), timeout.Token);
         clock.Now = At(15).AddTicks(9);
         await held.CommitAsync(timeout.Token);
-        await attempt;
+        Assert.True((await attempt).IsSuccess);
         await using var db = database.Context();
         Assert.True((await db.Rooms.SingleAsync(x => x.Id == room.Id, timeout.Token)).IsDeleted);
     }
@@ -172,9 +170,9 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => attempt);
         await held.CommitAsync(timeout.Token);
         var saved = await Rooms(database).GetAsync(room.Id, timeout.Token);
-        Assert.Equal(room.Version, saved.Version);
-        Assert.Equal(room.Name, saved.Room.Name);
-        await Rooms(database).DeleteAsync(room.Id, [room.Version], timeout.Token);
+        Assert.Equal(room.Version, saved.Value.Version);
+        Assert.Equal(room.Name, saved.Value.Room.Name);
+        Assert.True((await Rooms(database).DeleteAsync(room.Id, [room.Version], timeout.Token)).IsSuccess);
     }
 
     [Theory]
@@ -189,10 +187,10 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
             ? rooms.DeleteAsync(room.Id, [room.Version], TestContext.Current.CancellationToken)
             : rooms.UpdateAsync(room.Id, Details(room) with { Name = "Changed", Services = [] }, [room.Version], TestContext.Current.CancellationToken));
         var saved = await Rooms(database).GetAsync(room.Id, TestContext.Current.CancellationToken);
-        Assert.Equal(room.Version, saved.Version);
-        Assert.Equal(room.Name, saved.Room.Name);
-        Assert.Equal(room.Services.Select(x => x.Id).Order(), saved.Room.Services.Select(x => x.Id).Order());
-        await Rooms(database).DeleteAsync(room.Id, [room.Version], TestContext.Current.CancellationToken);
+        Assert.Equal(room.Version, saved.Value.Version);
+        Assert.Equal(room.Name, saved.Value.Room.Name);
+        Assert.Equal(room.Services.Select(x => x.Id).Order(), saved.Value.Room.Services.Select(x => x.Id).Order());
+        Assert.True((await Rooms(database).DeleteAsync(room.Id, [room.Version], TestContext.Current.CancellationToken)).IsSuccess);
     }
 
     [Fact]
@@ -203,20 +201,16 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
         var rooms = Rooms(database, new RoomLockObserver(2));
         var errors = await Task.WhenAll(Rename(room), Rename(other));
         Assert.Single(errors, x => x is null);
-        Assert.Single(errors, x => x == RoomFailure.NameConflict);
+        Assert.Single(errors, x => x is RoomError.NameConflict);
         await using var db = database.Context();
         var saved = await db.Rooms.ToListAsync(TestContext.Current.CancellationToken);
         Assert.Single(saved, x => x.Name == "Shared name");
         Assert.Single(saved, x => x.Version == room.Version || x.Version == other.Version);
 
-        async Task<RoomFailure?> Rename(Confera.Domain.Rooms.Room value)
+        async Task<RoomError?> Rename(Confera.Domain.Rooms.Room value)
         {
-            try
-            {
-                await rooms.UpdateAsync(value.Id, Details(value) with { Name = "Shared name" }, [value.Version], TestContext.Current.CancellationToken);
-                return null;
-            }
-            catch (RoomOperationException error) { return error.Failure; }
+            var result = await rooms.UpdateAsync(value.Id, Details(value) with { Name = "Shared name" }, [value.Version], TestContext.Current.CancellationToken);
+            return result.IsSuccess ? null : result.Error;
         }
     }
 
@@ -247,7 +241,7 @@ public sealed class RoomTransactionTests(PostgresFixture postgres)
     private static RoomCommand Details(Confera.Domain.Rooms.Room room) => new(room.Name, room.Capacity, room.HourlyRate,
         room.Services.Select(x => new Confera.Domain.Rooms.RoomServiceData(x.Name, x.Price)).ToArray());
     private static RoomManagementService Rooms(TestDatabase db, params IInterceptor[] interceptors) =>
-        new(new RoomStore(new BookingContextFactory(db, interceptors)), new BookingClock(At(9)));
+        new(new RoomStore(new BookingContextFactory(db, interceptors), NullLogger<RoomStore>.Instance), new BookingClock(At(9)));
 
     private sealed class PauseBeforeCommit : DbTransactionInterceptor
     {
