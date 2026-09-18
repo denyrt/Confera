@@ -47,7 +47,7 @@ alongside their corresponding application use cases.
 | A1 | Availability search | Done | [PR #10](https://github.com/denyrt/Confera/pull/10), merged as `85988e8` on 2026-09-16 and confirmed on fetched origin/main. GET /rooms/availability with current services and page/pageSize; shared RentalPeriod and tariff coverage. Release build and all 290 tests passed on Windows. [Plan and validation evidence](plans/a1-availability-search-plan.md#8-implementation-and-validation-record). |
 | H1 | Complete the five business API operations | Done | B1, R1, and A1 deliver all five core operations, plus the supporting room GET. A1's merge in PR #10 (`85988e8`) completes the operation set on main; HTTP/OpenAPI and all 290 tests passed. |
 | Q1 | Reports and assignment completion | Done | Both reports, snapshot aggregates, HTTP/OpenAPI, real-seed assignment path, and documentation merged in [PR #11](https://github.com/denyrt/Confera/pull/11) (`b7928a8`), 2026-09-17. Release build and all 320 tests passed. [Plan and evidence](plans/q1-reports-plan.md#9-implementation-and-validation-record). |
-| RF1 | Readability and explicit operation results | Verified | Typed Application results and explicit controller mappings implemented locally on feature/readability-refactoring after documentation commit `4c2e1f5`. Release build and all 344 tests passed on Windows, 2026-09-18. Unmerged; Domain validation remains a later checkpoint. [Plan and validation](plans/readability-refactoring-plan.md#11-implementation-and-validation-record). |
+| RF1 | Readability and explicit operation results | Done | Typed Application results and explicit controller mappings merged in [PR #12](https://github.com/denyrt/Confera/pull/12) as `f777e46`, confirmed on fetched origin/main on 2026-09-18. Release build and all 344 tests passed on Windows. Domain validation remains a later checkpoint. [Plan and validation](plans/readability-refactoring-plan.md#11-implementation-and-validation-record). |
 
 ### D1: Domain booking creation and tariff pricing
 
@@ -380,7 +380,8 @@ The maintainer accepted the [refactoring plan](plans/readability-refactoring-pla
 on 2026-09-18 and authorized a feature branch with documentation as its first
 changes and one local documentation commit (`4c2e1f5`). The maintainer then
 authorized implementation of the agreed boundary refactor. The boundary work is
-Verified locally; publication and merge have not occurred.
+Done: [PR #12](https://github.com/denyrt/Confera/pull/12) merged as `f777e46`,
+confirmed on fetched `origin/main` and matching local `main` on 2026-09-18.
 
 Agreed direction: a small Application-owned result type, feature-specific typed
 errors, explicit controller HTTP mapping, shared ProblemDetails formatting, and
@@ -421,10 +422,11 @@ The EF model has no pending changes. All 111 local links/anchors, 38 solution
 paths, 17 Markdown registrations, formatting, and diff checks passed.
 
 Initial AppHost attempts failed because of explicit Docker pipe overrides; all
-12 passed with the documented normal Docker context discovery. Hosted Linux CI
-has not run for this local change. Runtime evidence is recorded in the plan and
-ignored TRX artifacts. Mark RF1 Done only after the implementation merges and
-that merge is confirmed; non-throwing Domain validation remains separate.
+12 passed with the documented normal Docker context discovery. The local
+validation record does not include hosted Linux CI. Runtime evidence is recorded
+in the plan and ignored TRX artifacts. Merge confirmation completes RF1;
+non-throwing Domain validation remains separate. The plan retains its historical
+pre-merge validation record; this roadmap records the final merged status.
 
 ## Record each task result
 
