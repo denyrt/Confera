@@ -16,11 +16,6 @@ public sealed class SearchAvailabilityService(IAvailabilityReader reader, TimePr
         {
             return await SearchCoreAsync(query, cancellationToken);
         }
-        catch (BookingValidationException error) when (!cancellationToken.IsCancellationRequested
-            && error.Error == BookingValidationError.InvalidPeriod)
-        {
-            return Result<AvailabilityPage, AvailabilityError>.Failure(new AvailabilityError.InvalidPeriod(error.Message));
-        }
         catch (AvailabilityOperationException error) when (!cancellationToken.IsCancellationRequested
             && error.Failure == AvailabilityFailure.PersistenceUnavailable)
         {
@@ -42,9 +37,16 @@ public sealed class SearchAvailabilityService(IAvailabilityReader reader, TimePr
             return Result<AvailabilityPage, AvailabilityError>.Failure(new AvailabilityError.InvalidRequest());
         }
 
-        var period = RentalPeriod.Create(query.StartsAtUtc, query.EndsAtUtc);
+        if (!RentalPeriod.TryCreate(query.StartsAtUtc, query.EndsAtUtc, out var period, out var failure))
+        {
+            return Reject(failure, cancellationToken);
+        }
+
         var nowUtc = UtcPrecision.Floor(timeProvider.GetUtcNow().UtcDateTime);
-        BookingValidation.RequireBookingPeriod(period, nowUtc);
+        if (!BookingValidation.TryValidateBookingPeriod(period, nowUtc, out failure))
+        {
+            return Reject(failure, cancellationToken);
+        }
 
         var rules = await reader.GetPricingRulesAsync(cancellationToken);
         if (!BookingPriceCalculator.HasFullCoverage(period, rules))
@@ -57,5 +59,17 @@ public sealed class SearchAvailabilityService(IAvailabilityReader reader, TimePr
         var page = new AvailabilityPage(rooms.Take(query.PageSize).ToArray(), query.Page, query.PageSize,
             rooms.Count > query.PageSize);
         return Result<AvailabilityPage, AvailabilityError>.Success(page);
+    }
+
+    private static Result<AvailabilityPage, AvailabilityError> Reject(BookingValidationFailure failure,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (failure.Kind != BookingValidationError.InvalidPeriod)
+        {
+            throw new InvalidOperationException("Unexpected availability validation failure.");
+        }
+
+        return Result<AvailabilityPage, AvailabilityError>.Failure(new AvailabilityError.InvalidPeriod(failure.Description));
     }
 }

@@ -48,6 +48,7 @@ alongside their corresponding application use cases.
 | H1 | Complete the five business API operations | Done | B1, R1, and A1 deliver all five core operations, plus the supporting room GET. A1's merge in PR #10 (`85988e8`) completes the operation set on main; HTTP/OpenAPI and all 290 tests passed. |
 | Q1 | Reports and assignment completion | Done | Both reports, snapshot aggregates, HTTP/OpenAPI, real-seed assignment path, and documentation merged in [PR #11](https://github.com/denyrt/Confera/pull/11) (`b7928a8`), 2026-09-17. Release build and all 320 tests passed. [Plan and evidence](plans/q1-reports-plan.md#9-implementation-and-validation-record). |
 | RF1 | Readability and explicit operation results | Done | Typed Application results and explicit controller mappings merged in [PR #12](https://github.com/denyrt/Confera/pull/12) as `f777e46`, confirmed on fetched origin/main on 2026-09-18. Release build and all 344 tests passed on Windows. Domain validation remains a later checkpoint. [Plan and validation](plans/readability-refactoring-plan.md#11-implementation-and-validation-record). |
+| RF2 | Expected Domain validation failures without exceptions | Verified | Domain-owned typed failures and Try methods preserve RF1 Application/HTTP contracts. Release build and all 400 tests passed on Windows, 2026-09-18; EF model unchanged. Local implementation is unmerged. [Plan and validation](plans/domain-validation-results-plan.md#validation-record). |
 
 ### D1: Domain booking creation and tariff pricing
 
@@ -427,6 +428,36 @@ validation record does not include hosted Linux CI. Runtime evidence is recorded
 in the plan and ignored TRX artifacts. Merge confirmation completes RF1;
 non-throwing Domain validation remains separate. The plan retains its historical
 pre-merge validation record; this roadmap records the final merged status.
+
+### RF2: Expected Domain validation failures without exceptions
+
+The maintainer approved the [RF2 plan](plans/domain-validation-results-plan.md)
+and implementation on 2026-09-18. Work starts from RF1's completed baseline on
+`refactor/domain-validation-results` with no upstream.
+
+Completion criteria:
+
+- Booking, availability, and room create/update use non-throwing Domain input
+  validation with typed failures, without Domain-to-Application dependencies.
+- Throwing wrappers share the same rules; configuration/invariant failures and
+  cancellation remain distinct from expected input rejection.
+- RF1 HTTP details, precedence, metadata, transactions, snapshots, and existing
+  business rules remain compatible; new paths and all four suites are verified.
+- Current architecture documentation and actual validation evidence are updated.
+
+Verified on Windows, 2026-09-18: Release build passed without warnings/errors;
+Domain 142, Application 85, Integration 161, and AppHost 12 tests passed (400
+total, no failures/skips in final runs). Before refactoring, 12 Domain and nine
+HTTP characterization cases passed on RF1; they retain exact room details and
+mixed-input precedence after migration. New coverage protects typed failures,
+wrappers, no partial mutations, input capture, cancellation, and cleanup.
+
+EF reports no model changes. All 115 local links/anchors, 39 solution paths,
+18 Markdown registrations, scoped formatting, source review, and whitespace
+checks passed. Actual commands and the corrected test-only assertion from the
+first Domain run are recorded in the plan. Hosted Linux CI was not run. RF2
+remains local and unmerged; confirming merge and updating this entry to Done
+remain the post-merge handoff.
 
 ## Record each task result
 

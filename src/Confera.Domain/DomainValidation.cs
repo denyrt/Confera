@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 
 namespace Confera.Domain;
@@ -16,43 +17,98 @@ internal static class DomainValidation
 
     public static string RequireText(string value, int maxLength, string parameterName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
-
-        var normalized = NameIdentity.Trim(value);
-
-        if (normalized.Length > maxLength)
+        if (!TryNormalizeText(value, maxLength, parameterName, out var normalized, out var failure))
         {
-            throw new ArgumentException($"Value cannot exceed {maxLength} characters.", parameterName);
+            throw failure.ToException();
         }
 
         return normalized;
     }
 
+    public static bool TryNormalizeText(string? value, int maxLength, string parameterName,
+        [NotNullWhen(true)] out string? normalized, [NotNullWhen(false)] out InputFailure? failure)
+    {
+        normalized = null;
+        failure = null;
+        if (value is null)
+        {
+            failure = InputFailure.Null(parameterName);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            failure = new(InputFailureKind.Invalid,
+                "The value cannot be an empty string or composed entirely of whitespace.", parameterName);
+            return false;
+        }
+
+        var trimmed = NameIdentity.Trim(value);
+        if (trimmed.Length > maxLength)
+        {
+            failure = new(InputFailureKind.Invalid, $"Value cannot exceed {maxLength} characters.", parameterName);
+            return false;
+        }
+
+        normalized = trimmed;
+        return true;
+    }
+
     public static T RequirePositive<T>(T value, string parameterName) where T : INumber<T>
     {
-        if (value <= T.Zero)
+        if (ValidatePositive(value, parameterName) is { } failure)
         {
-            throw new ArgumentOutOfRangeException(parameterName, "Value must be greater than 0.");
+            throw failure.ToException();
         }
 
         return value;
     }
+
+    public static InputFailure? ValidatePositive<T>(T value, string parameterName) where T : INumber<T> =>
+        value <= T.Zero
+            ? new(InputFailureKind.OutOfRange, "Value must be greater than 0.", parameterName)
+            : null;
 
     public static DateTime RequireUtc(DateTime value, string parameterName)
     {
-        if (value.Kind != DateTimeKind.Utc || value.Ticks % 10 != 0)
+        if (ValidateUtc(value, parameterName) is { } failure)
         {
-            throw new ArgumentException("Date and time must be UTC with whole-microsecond precision.", parameterName);
+            throw failure.ToException();
         }
 
         return value;
     }
 
-    public static decimal RequireHourlyRate(decimal value, string parameterName) =>
-        RequireDecimal(value, 1000m, 100000m, 3, parameterName);
+    private static InputFailure? ValidateUtc(DateTime value, string parameterName) =>
+        value.Kind != DateTimeKind.Utc || value.Ticks % 10 != 0
+            ? new(InputFailureKind.Invalid, "Date and time must be UTC with whole-microsecond precision.", parameterName)
+            : null;
 
-    public static decimal RequireServicePrice(decimal value, string parameterName) =>
-        RequireDecimal(value, 200m, 20000m, 3, parameterName);
+    public static decimal RequireHourlyRate(decimal value, string parameterName)
+    {
+        if (ValidateHourlyRate(value, parameterName) is { } failure)
+        {
+            throw failure.ToException();
+        }
+
+        return value;
+    }
+
+    public static InputFailure? ValidateHourlyRate(decimal value, string parameterName) =>
+        ValidateDecimal(value, 1000m, 100000m, 3, parameterName);
+
+    public static decimal RequireServicePrice(decimal value, string parameterName)
+    {
+        if (ValidateServicePrice(value, parameterName) is { } failure)
+        {
+            throw failure.ToException();
+        }
+
+        return value;
+    }
+
+    public static InputFailure? ValidateServicePrice(decimal value, string parameterName) =>
+        ValidateDecimal(value, 200m, 20000m, 3, parameterName);
 
     public static decimal RequireMultiplier(decimal value, string parameterName) =>
         RequireDecimal(value, 0.50m, 2.00m, 2, parameterName);
@@ -75,27 +131,41 @@ internal static class DomainValidation
 
     private static decimal RequireDecimal(decimal value, decimal minimum, decimal maximum, int scale, string parameterName)
     {
-        if (value < minimum || value > maximum)
+        if (ValidateDecimal(value, minimum, maximum, scale, parameterName) is { } failure)
         {
-            throw new ArgumentOutOfRangeException(parameterName, $"Value must be between {minimum} and {maximum}.");
-        }
-
-        if (decimal.Round(value, scale) != value)
-        {
-            throw new ArgumentException($"Value must have at most {scale} fractional digits.", parameterName);
+            throw failure.ToException();
         }
 
         return value;
     }
 
+    private static InputFailure? ValidateDecimal(decimal value, decimal minimum, decimal maximum, int scale, string parameterName)
+    {
+        if (value < minimum || value > maximum)
+        {
+            return new(InputFailureKind.OutOfRange, $"Value must be between {minimum} and {maximum}.", parameterName);
+        }
+
+        if (decimal.Round(value, scale) != value)
+        {
+            return new(InputFailureKind.Invalid, $"Value must have at most {scale} fractional digits.", parameterName);
+        }
+
+        return null;
+    }
+
     public static void RequireUtcInterval(DateTime startsAtUtc, DateTime endsAtUtc)
     {
-        RequireUtc(startsAtUtc, nameof(startsAtUtc));
-        RequireUtc(endsAtUtc, nameof(endsAtUtc));
-
-        if (endsAtUtc <= startsAtUtc)
+        if (ValidateUtcInterval(startsAtUtc, endsAtUtc) is { } failure)
         {
-            throw new ArgumentException("Interval must end after it starts.", nameof(endsAtUtc));
+            throw failure.ToException();
         }
     }
+
+    public static InputFailure? ValidateUtcInterval(DateTime startsAtUtc, DateTime endsAtUtc) =>
+        ValidateUtc(startsAtUtc, nameof(startsAtUtc))
+        ?? ValidateUtc(endsAtUtc, nameof(endsAtUtc))
+        ?? (endsAtUtc <= startsAtUtc
+            ? new(InputFailureKind.Invalid, "Interval must end after it starts.", nameof(endsAtUtc))
+            : null);
 }

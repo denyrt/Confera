@@ -23,9 +23,10 @@ Room details can be updated through validated methods. Replacing room services
 validates the complete input before changing the collection, requires unique
 normalized names, and preserves existing service IDs when names match. Matching
 services accept updated display spelling and prices; a different normalized
-name replaces the offering with a new ID. RoomDetails captures and validates
-an entire update before mutation. Real field/service changes rotate Version;
-equivalent replacements retain it. Deleted rooms cannot be updated or booked.
+name replaces the offering with a new ID. RoomDetails.TryCreate captures and
+validates an entire update before mutation, returning a typed input failure.
+Real field/service changes rotate Version; equivalent replacements retain it.
+Deleted rooms cannot be updated or booked.
 
 Booking-input validation requires UTC timestamps, a duration of 30 minutes to
 24 hours inclusive, and a start that is not before the supplied current time.
@@ -33,17 +34,19 @@ Selected service IDs must be unique and belong to the room; an empty selection
 is allowed. Room rates are 1,000–100,000 UAH and service prices 200–20,000 UAH,
 inclusive, with at most three fractional digits. Multipliers are 0.50–2.00 with
 at most two digits; trailing zeros do not count as extra precision. External
-times must be whole microseconds; `Room.Book` floors its UTC clock input once
+times must be whole microseconds; `Room.TryBook` floors its UTC clock input once
 before checking the start and recording creation time.
 
-`BookingPriceCalculator.Calculate(...)` returns immutable rental segments,
+`BookingPriceCalculator.TryCalculate(...)` returns immutable rental segments,
 selecting the highest-priority rule at each boundary. It requires full tariff
 coverage, handles daily rules crossing midnight, and rounds each segment to
-three fractional digits using `MidpointRounding.AwayFromZero`.
+three fractional digits using `MidpointRounding.AwayFromZero`. Missing coverage
+returns a typed failure without a partial price. The throwing Calculate wrapper
+uses the same implementation.
 
-`RentalPeriod.Create(...)` validates the interval once for callers of Room.Book
-and the calculator. BookingValidation.RequireBookingPeriod additionally checks
-the start against a supplied current time. HasFullCoverage and Calculate share
+`RentalPeriod.TryCreate(...)` validates the interval for callers of Room.TryBook
+and the calculator. BookingValidation.TryValidateBookingPeriod additionally checks
+the start against a supplied current time. HasFullCoverage and TryCalculate share
 tariff expansion and segment selection; a coverage query needs no hourly rate.
 Missing coverage returns false, while malformed configurations remain errors.
 
@@ -51,9 +54,10 @@ Missing coverage returns false, while malformed configurations remain errors.
 complete configuration, including disjoint, adjacent or masked rules and rules
 outside the booking. The database unique constraint protects concurrent writes.
 
-`Room.Book(...)` selects the current services, calculates rental segments, and
-returns a complete `Booking`. Booking generates its ID before creating its own
-service snapshots and price segments. It verifies ordered full segment coverage
+`Room.TryBook(...)` selects the current services, calculates rental segments, and
+returns a complete `Booking` or a typed period/selection/coverage failure.
+The throwing Book wrapper delegates to this method. Booking generates its ID
+before creating its own service snapshots and price segments. It verifies ordered full segment coverage
 and a consistent hourly rate, then calculates total price from the recorded
 rounded segment prices and service prices. Rounded zero segments and totals are
 allowed. Public collections expose read-only wrappers.
@@ -80,9 +84,11 @@ uses the same lock before room/service changes and lifecycle checks.
 
 POST /bookings exposes this use case with explicit-offset timestamp validation,
 stable ProblemDetails error codes, price breakdowns, and development Swagger UI.
-BookingValidation is shared Domain period/selection validation; expected
-BookingValidationException errors are distinct from configuration/invariant
-failures. There is no automatic write replay or persisted idempotency key.
+BookingValidation is shared Domain period/selection validation; its Try methods
+return expected BookingValidationFailure values. RoomDetails.TryCreate returns
+RoomValidationFailure. These carry safe descriptions without HTTP/provider types;
+configuration/invariant failures still throw. There is no automatic write replay
+or persisted idempotency key.
 
 Application returns `Result<TValue, TError>` for booking, room, availability,
 and report outcomes, with `Result<RoomError>` for deletion. Each feature owns
@@ -91,13 +97,15 @@ map them to the existing response contracts through the shared `ApiProblems`
 formatter. Request helpers use `Try...` conversion; automatic `[ApiController]`
 binding/model validation can still reject a request before the action runs.
 
-Known Domain validation and persistence exceptions are adapted around the full
-use case, including transaction disposal. Infrastructure recognizes provider
-failures and logs temporary failures with their original causes and request
+Application maps Domain validation failures explicitly and uses no exception
+adapter for expected Domain input rejection. Throwing factories and guards remain
+for direct callers, backed by the same rules. Known persistence exceptions are
+adapted around the full use case, including transaction disposal. Infrastructure
+recognizes provider failures and logs temporary failures with their original causes and request
 scope; Application does not duplicate these logs. Unexpected failures propagate
 to the global handler for a safe 500 response. Cancellation is not converted
-to an expected failure. Non-throwing Domain validation remains a separate
-follow-up in the [RF1 plan](plans/readability-refactoring-plan.md).
+to an expected failure. See [RF2](plans/domain-validation-results-plan.md) for the
+Domain validation contracts, compatibility requirements, and validation evidence.
 
 See [booking and pricing decisions](booking-and-pricing-rules.md) for the agreed
 time, availability, calculation, room-editing, and deletion policies.

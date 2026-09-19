@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Confera.Domain.Bookings;
 
 public static class BookingValidation
@@ -13,25 +15,41 @@ public static class BookingValidation
     /// </remarks>
     public static void RequireRentalPeriod(DateTime startsAtUtc, DateTime endsAtUtc)
     {
-        try
+        if (ValidateRentalPeriod(startsAtUtc, endsAtUtc) is { } failure)
         {
-            DomainValidation.RequireUtcInterval(startsAtUtc, endsAtUtc);
+            throw failure.ToException();
         }
-        catch (ArgumentException)
+    }
+
+    internal static BookingValidationFailure? ValidateRentalPeriod(DateTime startsAtUtc, DateTime endsAtUtc)
+    {
+        if (DomainValidation.ValidateUtcInterval(startsAtUtc, endsAtUtc) is not null)
         {
-            throw new BookingValidationException(BookingValidationError.InvalidPeriod,
+            return new(BookingValidationError.InvalidPeriod,
                 "The period must have ordered UTC endpoints with whole-microsecond precision.");
         }
 
         var duration = endsAtUtc - startsAtUtc;
         if (duration < TimeSpan.FromMinutes(30) || duration > TimeSpan.FromHours(24))
         {
-            throw new BookingValidationException(BookingValidationError.InvalidPeriod,
+            return new(BookingValidationError.InvalidPeriod,
                 "Booking duration must be between 30 minutes and 24 hours.");
         }
+
+        return null;
     }
 
     public static void RequireBookingPeriod(RentalPeriod period, DateTime nowUtc)
+    {
+        if (!TryValidateBookingPeriod(period, nowUtc, out var failure))
+        {
+            throw failure.ToException();
+        }
+    }
+
+    /// <summary>Checks past start; a null period or malformed clock remains a programming error.</summary>
+    public static bool TryValidateBookingPeriod(RentalPeriod period, DateTime nowUtc,
+        [NotNullWhen(false)] out BookingValidationFailure? failure)
     {
         ArgumentNullException.ThrowIfNull(period);
         // A bad application clock is an internal error, not invalid client input.
@@ -39,17 +57,34 @@ public static class BookingValidation
 
         if (period.StartsAtUtc < nowUtc)
         {
-            throw new BookingValidationException(BookingValidationError.InvalidPeriod, "Booking cannot start in the past.");
+            failure = new(BookingValidationError.InvalidPeriod, "Booking cannot start in the past.");
+            return false;
         }
+
+        failure = null;
+        return true;
     }
 
     public static void RequireServiceIds(IReadOnlyList<Guid>? serviceIds)
     {
+        if (!TryValidateServiceIds(serviceIds, out var failure))
+        {
+            throw failure.ToException();
+        }
+    }
+
+    public static bool TryValidateServiceIds([NotNullWhen(true)] IReadOnlyList<Guid>? serviceIds,
+        [NotNullWhen(false)] out BookingValidationFailure? failure)
+    {
         if (serviceIds is null || serviceIds.Contains(Guid.Empty)
             || serviceIds.Distinct().Count() != serviceIds.Count)
         {
-            throw new BookingValidationException(BookingValidationError.InvalidServiceSelection,
+            failure = new(BookingValidationError.InvalidServiceSelection,
                 "Supply a list of distinct nonempty service IDs; an empty list is allowed.");
+            return false;
         }
+
+        failure = null;
+        return true;
     }
 }

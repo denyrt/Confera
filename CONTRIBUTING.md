@@ -231,13 +231,16 @@ provider configuration and one-time initializer. It implements Application's
 booking persistence contract and future contracts as use cases require them.
 Application exposes expected outcomes through its own result and feature-error
 types. Controllers select HTTP responses explicitly; ApiProblems formats them,
-and the global handler handles unexpected failures. Known Domain and persistence
-exceptions are currently adapted at the Application boundary. Infrastructure
+and the global handler handles unexpected failures. Domain Try methods return
+typed input failures; Application maps them to its feature errors. Throwing
+Domain wrappers share the rules but are not used for expected request rejection.
+Known persistence exceptions are adapted at the Application boundary. Infrastructure
 logs recognized technical failures with the original exception and request scope.
 API references Infrastructure to compose DI and directly uses Domain's
 RoomServiceData when building room commands; controllers call Application use
 cases rather than access the context. See the
-[RF1 boundary design](docs/plans/readability-refactoring-plan.md).
+[RF1 boundary design](docs/plans/readability-refactoring-plan.md) and
+[RF2 Domain validation](docs/plans/domain-validation-results-plan.md).
 AppHost orchestrates executable services and external resources.
 
 Shared container/database test fixtures are linked source under `tests/Shared`;

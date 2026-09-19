@@ -121,12 +121,36 @@ public sealed class SearchAvailabilityTests
 
     private static SearchAvailabilityService Service(TestReader reader) => new(reader, new TestClock(At(9)));
 
+    [Fact]
+    public async Task CancellationDuringClockReadDoesNotBecomeInvalidPeriod()
+    {
+        var reader = new TestReader();
+        using var cancellation = new CancellationTokenSource();
+        var clock = new TestClock(At(12)) { OnRead = cancellation.Cancel };
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new SearchAvailabilityService(reader, clock).SearchAsync(Query(), cancellation.Token));
+        Assert.Equal(0, reader.TariffReads);
+        Assert.Equal(0, reader.RoomReads);
+    }
+
+    [Fact]
+    public async Task InvalidPaginationPrecedesInvalidPeriod()
+    {
+        var reader = new TestReader();
+        var result = await Service(reader).SearchAsync(Query() with { Page = int.MaxValue, EndsAtUtc = At(10) },
+            TestContext.Current.CancellationToken);
+        Assert.IsType<AvailabilityError.InvalidRequest>(result.Error);
+        Assert.Equal(0, reader.TariffReads);
+    }
+
     private sealed class TestClock(DateTime now) : TimeProvider
     {
+        public Action? OnRead { get; init; }
         public int Reads { get; private set; }
         public override DateTimeOffset GetUtcNow()
         {
             Reads++;
+            OnRead?.Invoke();
             return new DateTimeOffset(now);
         }
     }

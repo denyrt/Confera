@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Confera.Application.Common;
 using Confera.Domain;
 using Confera.Domain.Rooms;
@@ -15,14 +16,15 @@ public sealed class RoomManagementService(IRoomStore store, TimeProvider timePro
 
         try
         {
-            var room = new Room(Validate(command));
+            if (!TryValidate(command, out var details, out var failure))
+            {
+                return Reject(failure, cancellationToken);
+            }
+
+            var room = new Room(details);
             var result = RoomState.FromRoom(room);
             await store.CreateAsync(room, cancellationToken);
             return Result<RoomState, RoomError>.Success(result);
-        }
-        catch (RoomValidationException error) when (!cancellationToken.IsCancellationRequested)
-        {
-            return Result<RoomState, RoomError>.Failure(new RoomError.InvalidData(error.Message));
         }
         catch (RoomOperationException error) when (!cancellationToken.IsCancellationRequested)
         {
@@ -66,7 +68,11 @@ public sealed class RoomManagementService(IRoomStore store, TimeProvider timePro
 
         try
         {
-            var details = Validate(command);
+            if (!TryValidate(command, out var details, out var failure))
+            {
+                return Reject(failure, cancellationToken);
+            }
+
             var versions = expectedVersions?.ToArray();
 
             await using var transaction = await store.BeginAsync(cancellationToken);
@@ -92,10 +98,6 @@ public sealed class RoomManagementService(IRoomStore store, TimeProvider timePro
             await transaction.SaveAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Result<RoomState, RoomError>.Success(result);
-        }
-        catch (RoomValidationException error) when (!cancellationToken.IsCancellationRequested)
-        {
-            return Result<RoomState, RoomError>.Failure(new RoomError.InvalidData(error.Message));
         }
         catch (RoomOperationException error) when (!cancellationToken.IsCancellationRequested)
         {
@@ -157,10 +159,17 @@ public sealed class RoomManagementService(IRoomStore store, TimeProvider timePro
         return await transaction.HasUnfinishedBookingsAsync(roomId, nowUtc, cancellationToken);
     }
 
-    private static RoomDetails Validate(RoomCommand command)
+    private static bool TryValidate(RoomCommand command, [NotNullWhen(true)] out RoomDetails? details,
+        [NotNullWhen(false)] out RoomValidationFailure? failure)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return new RoomDetails(command.Name, command.Capacity, command.HourlyRate, command.Services);
+        return RoomDetails.TryCreate(command.Name, command.Capacity, command.HourlyRate, command.Services, out details, out failure);
+    }
+
+    private static Result<RoomState, RoomError> Reject(RoomValidationFailure failure, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Result<RoomState, RoomError>.Failure(new RoomError.InvalidData(failure.Description));
     }
 
     private static RoomError? CheckVersion(Room room, Guid[]? versions)

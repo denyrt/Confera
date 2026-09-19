@@ -22,17 +22,6 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
         {
             return await CreateCoreAsync(command, cancellationToken);
         }
-        catch (BookingValidationException error) when (!cancellationToken.IsCancellationRequested)
-        {
-            BookingError failure = error.Error switch
-            {
-                BookingValidationError.InvalidPeriod => new BookingError.InvalidPeriod(error.Message),
-                BookingValidationError.InvalidServiceSelection => new BookingError.InvalidServiceSelection(error.Message),
-                BookingValidationError.MissingTariffCoverage => new BookingError.MissingTariffCoverage(error.Message),
-                _ => throw new InvalidOperationException("Unknown booking validation failure.", error)
-            };
-            return Result<BookingResult, BookingError>.Failure(failure);
-        }
         catch (BookingOperationException error) when (!cancellationToken.IsCancellationRequested
             && error.Failure == BookingFailure.RoomUnavailable)
         {
@@ -53,9 +42,16 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
             return Result<BookingResult, BookingError>.Failure(new BookingError.InvalidRequest());
         }
 
-        var rentalPeriod = RentalPeriod.Create(command.StartsAtUtc, command.EndsAtUtc);
+        if (!RentalPeriod.TryCreate(command.StartsAtUtc, command.EndsAtUtc, out var rentalPeriod, out var failure))
+        {
+            return Reject(failure, cancellationToken);
+        }
 
-        BookingValidation.RequireServiceIds(command.ServiceIds);
+        if (!BookingValidation.TryValidateServiceIds(command.ServiceIds, out failure))
+        {
+            return Reject(failure, cancellationToken);
+        }
+
         // Capture caller-owned input before the first asynchronous boundary.
         var serviceIds = command.ServiceIds.ToArray();
 
@@ -69,18 +65,39 @@ public sealed class CreateBookingService(IBookingStore store, TimeProvider timeP
         var rules = await transaction.GetPricingRulesAsync(cancellationToken);
         var nowUtc = UtcPrecision.Floor(timeProvider.GetUtcNow().UtcDateTime);
 
-        BookingValidation.RequireBookingPeriod(rentalPeriod, nowUtc);
+        if (!BookingValidation.TryValidateBookingPeriod(rentalPeriod, nowUtc, out failure))
+        {
+            return Reject(failure, cancellationToken);
+        }
 
         if (await transaction.HasOverlapAsync(room.Id, command.StartsAtUtc, command.EndsAtUtc, cancellationToken))
         {
             return Result<BookingResult, BookingError>.Failure(new BookingError.RoomUnavailable());
         }
 
-        var booking = room.Book(rentalPeriod, nowUtc, serviceIds, rules);
+        if (!room.TryBook(rentalPeriod, nowUtc, serviceIds, rules, out var booking, out failure))
+        {
+            return Reject(failure, cancellationToken);
+        }
+
         // Prepare the response before writing; success is still returned only after commit.
         var result = BookingResult.FromBooking(booking);
         await transaction.SaveAsync(booking, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Result<BookingResult, BookingError>.Success(result);
+    }
+
+    private static Result<BookingResult, BookingError> Reject(BookingValidationFailure failure,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        BookingError error = failure.Kind switch
+        {
+            BookingValidationError.InvalidPeriod => new BookingError.InvalidPeriod(failure.Description),
+            BookingValidationError.InvalidServiceSelection => new BookingError.InvalidServiceSelection(failure.Description),
+            BookingValidationError.MissingTariffCoverage => new BookingError.MissingTariffCoverage(failure.Description),
+            _ => throw new InvalidOperationException("Unknown booking validation failure.")
+        };
+        return Result<BookingResult, BookingError>.Failure(error);
     }
 }

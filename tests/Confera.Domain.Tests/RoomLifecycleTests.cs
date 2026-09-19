@@ -67,8 +67,11 @@ public sealed class RoomLifecycleTests
     {
         var room = CreateRoom();
         var version = room.Version;
-        Assert.Throws<RoomValidationException>(() => room.Update(new RoomDetails("Changed", 60, 2500m,
-            [new("Projector", 600m), new("Wi-Fi", 100m)])));
+        Assert.False(RoomDetails.TryCreate("Changed", 60, 2500m,
+            [new("Projector", 600m), new("Wi-Fi", 100m)], out var details, out var failure));
+        Assert.Null(details);
+        Assert.NotNull(failure);
+        Assert.Equal(RoomValidationError.InvalidServicePrice, failure.Kind);
         Assert.Throws<RoomValidationException>(() => new RoomDetails("Changed", 60, 2500m,
             [new("Projector", 600m), new(" projector ", 700m)]));
         Assert.Equal("Room", room.Name);
@@ -82,7 +85,9 @@ public sealed class RoomLifecycleTests
     public void ValidatedReplacementCapturesCallerCollection()
     {
         RoomServiceData[] input = [new("Service", 300m)];
-        var details = new RoomDetails("Room", 50, 2000m, input);
+        Assert.True(RoomDetails.TryCreate("Room", 50, 2000m, input, out var details, out var failure));
+        Assert.NotNull(details);
+        Assert.Null(failure);
         input[0] = new("Other", 400m);
         Assert.Equal("Service", details.Services[0].Name);
         Assert.Throws<NotSupportedException>(() => ((IList<RoomServiceData>)details.Services)[0] = input[0]);

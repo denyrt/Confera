@@ -175,6 +175,49 @@ public sealed class RoomManagementTests
         Assert.True(store.Disposed);
         Assert.False(store.Saved);
     }
+
+    [Fact]
+    public async Task InvalidReplacementDoesNotMutateRoomOrOpenTransaction()
+    {
+        var store = new TestStore();
+        var room = store.Room!;
+        var version = room.Version;
+        var command = Command(60) with { Name = "Changed", Services = [new("Good", 300m), new("Bad", 100m)] };
+        var result = await Service(store).UpdateAsync(room.Id, command, null, TestContext.Current.CancellationToken);
+        var error = Assert.IsType<RoomError.InvalidData>(result.Error);
+        Assert.Equal("Value must be between 200 and 20000. (Parameter 'Price')", error.Description);
+        Assert.Equal("Room", room.Name);
+        Assert.Equal(50, room.Capacity);
+        Assert.Empty(room.Services);
+        Assert.Equal(version, room.Version);
+        Assert.Equal(0, store.Begins);
+        Assert.False(store.Saved);
+    }
+
+    [Fact]
+    public async Task CancellationDuringInputCaptureDoesNotBecomeInvalidData()
+    {
+        var store = new TestStore();
+        using var cancellation = new CancellationTokenSource();
+        var command = Command(50) with { Services = new CancelingServices(cancellation) };
+        await Assert.ThrowsAsync<OperationCanceledException>(() => Service(store).CreateAsync(command, cancellation.Token));
+        Assert.Equal(0, store.Begins);
+        Assert.False(store.Saved);
+    }
+
+    private sealed class CancelingServices(CancellationTokenSource cancellation) : IReadOnlyList<RoomServiceData>
+    {
+        public int Count => 1;
+        public RoomServiceData this[int index] => new("Invalid", 100m);
+        public IEnumerator<RoomServiceData> GetEnumerator()
+        {
+            cancellation.Cancel();
+            yield return this[0];
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     private static RoomManagementService Service(TestStore store) => new(store, TimeProvider.System);
 
     private sealed class TestClock(DateTime now) : TimeProvider

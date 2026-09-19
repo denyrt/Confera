@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Confera.Domain.Bookings;
 
 namespace Confera.Domain.Rooms;
@@ -157,13 +158,39 @@ public sealed class Room
         IReadOnlyList<Guid> serviceIds,
         IReadOnlyList<BookingPricingRule> rules)
     {
+        if (!TryBook(period, nowUtc, serviceIds, rules, out var booking, out var failure))
+        {
+            throw failure.ToException();
+        }
+
+        return booking;
+    }
+
+    /// <summary>Creates a complete booking or returns an expected period, selection, or coverage rejection.</summary>
+    /// <remarks>The caller supplies an active room; invalid state, clock, or configuration still throws.</remarks>
+    public bool TryBook(
+        RentalPeriod period,
+        DateTime nowUtc,
+        IReadOnlyList<Guid>? serviceIds,
+        IReadOnlyList<BookingPricingRule> rules,
+        [NotNullWhen(true)] out Booking? booking,
+        [NotNullWhen(false)] out BookingValidationFailure? failure)
+    {
+        booking = null;
         EnsureActive();
         nowUtc = UtcPrecision.Floor(nowUtc);
-        BookingValidation.RequireBookingPeriod(period, nowUtc);
-        BookingValidation.RequireServiceIds(serviceIds);
+        if (!BookingValidation.TryValidateBookingPeriod(period, nowUtc, out failure)
+            || !BookingValidation.TryValidateServiceIds(serviceIds, out failure))
+        {
+            return false;
+        }
+
         ArgumentNullException.ThrowIfNull(rules, nameof(rules));
 
-        EnsureServiceIdsExist(serviceIds);
+        if (!TryValidateServiceOwnership(serviceIds, out failure))
+        {
+            return false;
+        }
 
         var selectedIds = serviceIds.ToHashSet();
         var selectedServices = _services
@@ -171,20 +198,29 @@ public sealed class Room
             .Select(x => new RoomServiceData(x.Name, x.Price))
             .ToArray();
 
-        var segments = BookingPriceCalculator.Calculate(period, HourlyRate, rules);
+        if (!BookingPriceCalculator.TryCalculate(period, HourlyRate, rules, out var segments, out failure))
+        {
+            return false;
+        }
 
-        return new Booking(Id, period.StartsAtUtc, period.EndsAtUtc, nowUtc, HourlyRate, selectedServices, segments);
+        booking = new Booking(Id, period.StartsAtUtc, period.EndsAtUtc, nowUtc, HourlyRate, selectedServices, segments);
+        return true;
     }
 
-    private void EnsureServiceIdsExist(IEnumerable<Guid> serviceIds)
+    private bool TryValidateServiceOwnership(IEnumerable<Guid> serviceIds,
+        [NotNullWhen(false)] out BookingValidationFailure? failure)
     {
         var supportedIds = _services.Select(x => x.Id).ToHashSet();
 
         if (serviceIds.Any(id => !supportedIds.Contains(id)))
         {
-            throw new BookingValidationException(BookingValidationError.InvalidServiceSelection,
+            failure = new(BookingValidationError.InvalidServiceSelection,
                 "Selected services are not available in this room.");
+            return false;
         }
+
+        failure = null;
+        return true;
     }
 
     private void EnsureActive()

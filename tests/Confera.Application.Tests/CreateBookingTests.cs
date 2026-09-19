@@ -207,6 +207,89 @@ public sealed class CreateBookingTests
     private static CreateBookingCommand Command(TestStore store) =>
         new(store.Room!.Id, At(11), At(15), store.Room.Services.Select(x => x.Id).ToArray());
 
+    [Theory]
+    [InlineData("room_id", typeof(BookingError.InvalidRequest))]
+    [InlineData("period", typeof(BookingError.InvalidPeriod))]
+    [InlineData("selection", typeof(BookingError.InvalidServiceSelection))]
+    public async Task InvalidInputPrecedenceIsPreservedBeforePersistence(string scenario, Type errorType)
+    {
+        var store = new TestStore();
+        var command = Command(store) with { ServiceIds = [Guid.Empty] };
+        if (scenario != "selection") command = command with { EndsAtUtc = command.StartsAtUtc };
+        if (scenario == "room_id") command = command with { RoomId = Guid.Empty };
+
+        var result = await Service(store).CreateAsync(command, TestContext.Current.CancellationToken);
+        Assert.IsType(errorType, result.Error);
+        Assert.Equal(0, store.Begins);
+        Assert.Null(store.Saved);
+    }
+
+    [Theory]
+    [InlineData("missing", typeof(BookingError.RoomNotFound))]
+    [InlineData("past", typeof(BookingError.InvalidPeriod))]
+    [InlineData("overlap", typeof(BookingError.RoomUnavailable))]
+    [InlineData("selection", typeof(BookingError.InvalidServiceSelection))]
+    public async Task RejectionsKeepOrderAfterLockAndBeforeTariffConfiguration(string scenario, Type errorType)
+    {
+        var store = new TestStore { Overlap = scenario != "selection" };
+        var command = Command(store) with { ServiceIds = [Guid.NewGuid()] };
+        store.Rules = [store.Rules[0], store.Rules[0]];
+        if (scenario == "missing") store.Room = null;
+        var clock = new TestClock(scenario is "missing" or "past" ? At(12) : At(9));
+
+        var result = await new CreateBookingService(store, clock).CreateAsync(command, TestContext.Current.CancellationToken);
+        Assert.IsType(errorType, result.Error);
+        Assert.True(store.Disposed);
+        Assert.Null(store.Saved);
+        Assert.False(store.Committed);
+    }
+
+    [Fact]
+    public async Task CapturesSelectedIdsBeforeAsynchronousRoomLock()
+    {
+        var store = new TestStore();
+        Guid[] ids = [store.Room!.Services.First().Id];
+        var command = Command(store) with { ServiceIds = ids };
+        store.AfterRoomLock = () => ids[0] = Guid.NewGuid();
+
+        var result = await Service(store).CreateAsync(command, TestContext.Current.CancellationToken);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value.Services);
+        Assert.True(store.Committed);
+    }
+
+    [Theory]
+    [InlineData("past")]
+    [InlineData("selection")]
+    [InlineData("coverage")]
+    public async Task CancellationCannotBecomeDomainRejection(string scenario)
+    {
+        var store = new TestStore { Rules = [] };
+        var command = Command(store);
+        if (scenario == "selection") command = command with { ServiceIds = [Guid.NewGuid()] };
+        using var cancellation = new CancellationTokenSource();
+        store.AfterRoomLock = cancellation.Cancel;
+        var clock = new TestClock(scenario == "past" ? At(12) : At(9));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new CreateBookingService(store, clock).CreateAsync(command, cancellation.Token));
+        Assert.True(store.Disposed);
+        Assert.Null(store.Saved);
+        Assert.False(store.Committed);
+    }
+
+    [Fact]
+    public async Task DisposalFailureOverridesDomainRejectionWithoutSaving()
+    {
+        var store = new TestStore { Rules = [], FailDispose = true };
+        var result = await Service(store).CreateAsync(Command(store), TestContext.Current.CancellationToken);
+        Assert.IsType<BookingError.PersistenceUnavailable>(result.Error);
+        Assert.True(store.Disposed);
+        Assert.Null(store.Saved);
+        Assert.False(store.Committed);
+        Assert.Equal(1, store.Begins);
+    }
+
     private sealed class TestClock(DateTime now) : TimeProvider
     {
         public DateTime Now { get; set; } = now;

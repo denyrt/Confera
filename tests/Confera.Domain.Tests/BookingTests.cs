@@ -13,7 +13,11 @@ public sealed class BookingTests
         var now = At(10);
         var period = RentalPeriod.Create(At(11), At(15));
         var serviceIds = room.Services.Select(x => x.Id).ToArray();
-        var booking = room.Book(period, now, serviceIds, InitialRules());
+        var version = room.Version;
+        Assert.True(room.TryBook(period, now.AddTicks(9), serviceIds, InitialRules(), out var booking, out var failure));
+        Assert.NotNull(booking);
+        Assert.Null(failure);
+        Assert.Equal(version, room.Version);
 
         Assert.NotEqual(Guid.Empty, booking.Id);
         Assert.Equal(room.Id, booking.RoomId);
