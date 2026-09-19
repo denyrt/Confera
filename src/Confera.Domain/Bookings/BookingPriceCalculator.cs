@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Confera.Domain.Bookings;
 
 public static class BookingPriceCalculator
@@ -17,18 +19,42 @@ public static class BookingPriceCalculator
         decimal hourlyRate,
         IReadOnlyList<BookingPricingRule> rules)
     {
+        if (!TryCalculate(period, hourlyRate, rules, out var segments, out var failure))
+        {
+            throw failure.ToException();
+        }
+
+        return segments;
+    }
+
+    /// <summary>Calculates all segments, or rejects missing coverage without returning a partial price.</summary>
+    /// <remarks>Invalid validated inputs or tariff configuration still throw.</remarks>
+    public static bool TryCalculate(
+        RentalPeriod period,
+        decimal hourlyRate,
+        IReadOnlyList<BookingPricingRule> rules,
+        [NotNullWhen(true)] out IReadOnlyList<BookingRentalSegment>? segments,
+        [NotNullWhen(false)] out BookingValidationFailure? failure)
+    {
+        segments = null;
+        failure = null;
         ArgumentNullException.ThrowIfNull(period, nameof(period));
         DomainValidation.RequireHourlyRate(hourlyRate, nameof(hourlyRate));
         BookingPricingRule.ValidateSet(rules);
 
-        var coveredSegments = GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules)
-            ?? throw new BookingValidationException(BookingValidationError.MissingTariffCoverage,
+        var coveredSegments = GetCoveredSegments(period.StartsAtUtc, period.EndsAtUtc, rules);
+        if (coveredSegments is null)
+        {
+            failure = new(BookingValidationError.MissingTariffCoverage,
                 "The entire booking period must be covered by pricing rules.");
-        var segments = new List<BookingRentalSegment>();
+            return false;
+        }
+
+        var calculated = new List<BookingRentalSegment>();
 
         foreach (var segment in coveredSegments)
         {
-            segments.Add(new BookingRentalSegment(
+            calculated.Add(new BookingRentalSegment(
                 new DateTime(segment.StartsAtTicks, DateTimeKind.Utc),
                 new DateTime(segment.EndsAtTicks, DateTimeKind.Utc),
                 segment.Rule.Code,
@@ -36,7 +62,8 @@ public static class BookingPriceCalculator
                 hourlyRate));
         }
 
-        return segments.AsReadOnly();
+        segments = calculated.AsReadOnly();
+        return true;
     }
 
     private static List<RuleInterval>? GetCoveredSegments(

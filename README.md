@@ -36,8 +36,10 @@ implemented behavior.
 
 Application use cases return typed results for expected outcomes. Controllers
 show their success and error responses explicitly, using shared ProblemDetails
-formatting. The global exception handler handles unexpected failures; known
-Domain and persistence exceptions are adapted inside Application for now.
+formatting. Domain Try methods return typed expected validation failures, which
+Application maps to its feature errors. Throwing Domain wrappers share the same
+rules for direct callers. Persistence exceptions are adapted inside Application;
+the global exception handler handles unexpected failures.
 
 The original requirements and project decisions are documented separately:
 
@@ -51,6 +53,7 @@ The original requirements and project decisions are documented separately:
 - [A1 availability search contract, implementation plan, and validation](docs/plans/a1-availability-search-plan.md).
 - [Approved Q1 reports contract and implementation plan](docs/plans/q1-reports-plan.md).
 - [Readability refactoring plan and validation](docs/plans/readability-refactoring-plan.md).
+- [RF2 Domain validation plan and validation](docs/plans/domain-validation-results-plan.md).
 - [Local development, migrations, tests, and database reset](docs/local-development.md).
 - [P1 acceptance evidence](docs/plans/p1-validation.md).
 

@@ -30,6 +30,7 @@
   <Folder Name="/docs/plans/">
     <File Path="docs/plans/a1-availability-search-plan.md" />
     <File Path="docs/plans/b1-booking-implementation-plan.md" />
+    <File Path="docs/plans/domain-validation-results-plan.md" />
     <File Path="docs/plans/p1-persistence-specification.md" />
     <File Path="docs/plans/p1-validation.md" />
     <File Path="docs/plans/q1-reports-plan.md" />

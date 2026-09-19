@@ -358,6 +358,65 @@ public sealed class RoomHttpTests(PostgresFixture postgres)
         }
     }
 
+    [Theory]
+    [InlineData("name", "Value cannot exceed 64 characters. (Parameter 'name')")]
+    [InlineData("capacity", "Value must be greater than 0. (Parameter 'capacity')")]
+    [InlineData("rate_range", "Value must be between 1000 and 100000. (Parameter 'hourlyRate')")]
+    [InlineData("rate_precision", "Value must have at most 3 fractional digits. (Parameter 'hourlyRate')")]
+    [InlineData("service_name", "Value cannot exceed 64 characters. (Parameter 'Name')")]
+    [InlineData("service_range", "Value must be between 200 and 20000. (Parameter 'Price')")]
+    [InlineData("service_precision", "Value must have at most 3 fractional digits. (Parameter 'Price')")]
+    [InlineData("duplicates", "Service names must be unique within a room. (Parameter 'services')")]
+    [InlineData("duplicates_and_bad_price", "Value must be between 200 and 20000. (Parameter 'Price')")]
+    public async Task ValidationDetailsPreserveRoomMessagesAndMixedInputPrecedence(string scenario, string description)
+    {
+        await using var database = await postgres.CreateDatabaseAsync();
+        await using var factory = new BookingApiFactory(database);
+        using var client = factory.CreateHttpsClient();
+        var payload = Payload();
+        switch (scenario)
+        {
+            case "name":
+                payload["name"] = new string('x', 65);
+                payload["capacity"] = 0;
+                payload["hourlyRate"] = 999m;
+                break;
+            case "capacity":
+                payload["capacity"] = 0;
+                payload["hourlyRate"] = 999m;
+                break;
+            case "rate_range": payload["hourlyRate"] = 999.0001m; break;
+            case "rate_precision": payload["hourlyRate"] = 2000.0001m; break;
+            default:
+                var services = scenario switch
+                {
+                    "service_name" => new[] { new { name = new string('x', 65), price = 100m } },
+                    "service_range" => [new { name = "Service", price = 100.0001m }],
+                    "service_precision" => [new { name = "Service", price = 300.0001m }],
+                    "duplicates" => [new { name = "Service", price = 300m }, new { name = " service ", price = 400m }],
+                    _ => [new { name = "Service", price = 300m }, new { name = " service ", price = 400m }, new { name = "Later", price = 100m }]
+                };
+                payload["services"] = JsonSerializer.SerializeToNode(services);
+                break;
+        }
+
+        using var create = await client.PostAsJsonAsync("/rooms", payload, TestContext.Current.CancellationToken);
+        // Invalid data must precede a missing room and absent If-Match on replacement.
+        using var update = await Send(client, HttpMethod.Put, $"/rooms/{Guid.NewGuid()}", payload, null);
+        foreach (var response in new[] { create, update })
+        {
+            await AssertProblemAsync(response, HttpStatusCode.BadRequest, "invalid_room_data");
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(description, body.RootElement.GetProperty("detail").GetString());
+            Assert.True(response.Headers.CacheControl?.NoCache);
+            Assert.True(response.Headers.CacheControl?.NoStore);
+            Assert.Null(response.Headers.ETag);
+        }
+
+        Assert.Equal(0L, await database.ScalarAsync<long>("SELECT count(*) FROM \"Rooms\""));
+        Assert.Equal(0L, await database.ScalarAsync<long>("SELECT count(*) FROM \"RoomServices\""));
+    }
+
     private static JsonObject Payload() => new()
     {
         ["name"] = " Room ",

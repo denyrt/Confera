@@ -39,16 +39,23 @@ public sealed class BookingCoverageTests
         }
 
         Assert.Equal(covered, BookingPriceCalculator.HasFullCoverage(period, rules));
+        Assert.Equal(covered, BookingPriceCalculator.TryCalculate(period, 2000m, rules, out var segments, out var failure));
         if (covered)
         {
-            var segments = BookingPriceCalculator.Calculate(period, 2000m, rules);
+            Assert.NotNull(segments);
+            Assert.Null(failure);
             Assert.Equal(period.StartsAtUtc, segments[0].StartsAtUtc);
             Assert.Equal(period.EndsAtUtc, segments[^1].EndsAtUtc);
         }
         else
         {
+            Assert.Null(segments);
+            Assert.NotNull(failure);
+            Assert.Equal(BookingValidationError.MissingTariffCoverage, failure.Kind);
+            Assert.Equal("The entire booking period must be covered by pricing rules.", failure.Description);
             var error = Assert.Throws<BookingValidationException>(() => BookingPriceCalculator.Calculate(period, 2000m, rules));
             Assert.Equal(BookingValidationError.MissingTariffCoverage, error.Error);
+            Assert.Equal(failure.Description, error.Message);
         }
     }
 
@@ -59,6 +66,7 @@ public sealed class BookingCoverageTests
         BookingPricingRule[] rules = [Rule("day", 9, 18), Rule("first", 20, 22, 1m, 2), Rule("second", 22, 23, 1m, 2)];
         Assert.Throws<ArgumentException>(() => BookingPriceCalculator.HasFullCoverage(period, rules));
         Assert.Throws<ArgumentException>(() => BookingPriceCalculator.Calculate(period, 2000m, rules));
+        Assert.Throws<ArgumentException>(() => BookingPriceCalculator.TryCalculate(period, 2000m, rules, out _, out _));
     }
 
     [Fact]
@@ -67,5 +75,7 @@ public sealed class BookingCoverageTests
         Assert.Throws<ArgumentNullException>(() => BookingPriceCalculator.HasFullCoverage(null!, InitialRules()));
         Assert.Throws<ArgumentNullException>(() => BookingPriceCalculator.Calculate(null!, 2000m, InitialRules()));
         Assert.Throws<ArgumentNullException>(() => BookingValidation.RequireBookingPeriod(null!, At(9)));
+        Assert.Throws<ArgumentNullException>(() => BookingPriceCalculator.TryCalculate(null!, 2000m, InitialRules(), out _, out _));
+        Assert.Throws<ArgumentNullException>(() => BookingValidation.TryValidateBookingPeriod(null!, At(9), out _));
     }
 }
